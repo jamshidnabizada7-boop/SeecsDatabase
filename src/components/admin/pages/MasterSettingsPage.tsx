@@ -10,6 +10,7 @@ import {
   GraduationCap,
   DollarSign,
   Settings,
+  ShieldCheck,
 } from 'lucide-react'
 import CustomColumnsPage from './CustomColumnsPage'
 import SectorsPage from './SectorsPage'
@@ -18,6 +19,7 @@ import DegreesPage from './DegreesPage'
 import LocationsPage from './LocationsPage'
 import AnnualDataPage from './AnnualDataPage'
 import SettingsPage from './SettingsPage'
+import AdminSecurityPage from './AdminSecurityPage'
 
 export default function MasterSettingsPage({ defaultTab = 'custom-columns' }: { defaultTab?: string }) {
   const [activeTab, setActiveTab] = useState(defaultTab)
@@ -25,14 +27,18 @@ export default function MasterSettingsPage({ defaultTab = 'custom-columns' }: { 
   return (
     <div className="p-4 sm:p-6 space-y-6 max-w-7xl mx-auto">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Database Settings & Master Lookups</h1>
+        <h1 className="text-2xl font-bold tracking-tight">Database Settings & Administration</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Manage system-wide configuration, dynamic custom fields, academic degrees, cities, sectors, and AI assistant settings.
+          Manage system passwords, admin accounts, custom fields, academic degrees, cities, sectors, and AI assistant settings.
         </p>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
         <TabsList className="flex flex-wrap h-auto p-1 bg-muted/60 border gap-1">
+          <TabsTrigger value="security" className="flex items-center gap-1.5 px-3 py-2 text-xs sm:text-sm font-medium">
+            <ShieldCheck className="h-4 w-4 text-emerald-600" />
+            Admin & Security
+          </TabsTrigger>
           <TabsTrigger value="custom-columns" className="flex items-center gap-1.5 px-3 py-2 text-xs sm:text-sm">
             <Columns3 className="h-4 w-4" />
             Custom Fields
@@ -62,6 +68,10 @@ export default function MasterSettingsPage({ defaultTab = 'custom-columns' }: { 
             AI / LLM Config
           </TabsTrigger>
         </TabsList>
+
+        <TabsContent value="security" className="m-0 focus-visible:outline-none">
+          <AdminSecurityPage />
+        </TabsContent>
 
         <TabsContent value="custom-columns" className="m-0 focus-visible:outline-none">
           <CustomColumnsPage />
