@@ -1,21 +1,43 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { api } from '@/lib/client-utils'
-import { Loader2, KeyRound, ArrowLeft, UserPlus, CheckCircle2, AlertTriangle, Building2, Eye, EyeOff, Sparkles } from 'lucide-react'
+import {
+  Loader2,
+  KeyRound,
+  ArrowLeft,
+  UserPlus,
+  CheckCircle2,
+  AlertTriangle,
+  Building2,
+  Eye,
+  EyeOff,
+  Sparkles,
+  Plus,
+  Trash2,
+  Users,
+} from 'lucide-react'
 import { Separator } from '@/components/ui/separator'
 import { ThemeToggle } from '@/components/theme-toggle'
+import { Combobox } from '@/components/ui/combobox'
 
 interface Lookup {
   sectors: { id: string; name: string }[]
   cities: { id: string; name: string }[]
   locations: { id: string; address: string; city: { name: string } }[]
   degrees: { id: string; name: string }[]
+}
+
+interface CoFounderEntry {
+  name: string
+  role: string
+  email: string
+  department: string
 }
 
 export default function CompanyLogin({ onLoggedIn, onExit }: { onLoggedIn: (c: any) => void; onExit: () => void }) {
@@ -36,12 +58,13 @@ export default function CompanyLogin({ onLoggedIn, onExit }: { onLoggedIn: (c: a
   const [email, setEmail] = useState('')
   const [phone, setPhone] = useState('')
   const [website, setWebsite] = useState('')
-  const [sectorId, setSectorId] = useState('')
-  const [cityId, setCityId] = useState('')
-  const [locationId, setLocationId] = useState('')
+  const [sector, setSector] = useState('')
+  const [city, setCity] = useState('')
+  const [address, setAddress] = useState('')
   const [contactName, setContactName] = useState('')
   const [contactEmail, setContactEmail] = useState('')
   const [contactPhone, setContactPhone] = useState('')
+  const [coFounders, setCoFounders] = useState<CoFounderEntry[]>([])
 
   // Validation
   const apiKeyValid = apiKey.trim().length >= 8
@@ -57,6 +80,24 @@ export default function CompanyLogin({ onLoggedIn, onExit }: { onLoggedIn: (c: a
     } catch {}
   }
 
+  useEffect(() => {
+    loadLookup()
+  }, [])
+
+  const addCoFounder = () => {
+    setCoFounders([...coFounders, { name: '', role: 'Co-Founder', email: '', department: '' }])
+  }
+
+  const updateCoFounder = (index: number, field: keyof CoFounderEntry, val: string) => {
+    const updated = [...coFounders]
+    updated[index][field] = val
+    setCoFounders(updated)
+  }
+
+  const removeCoFounder = (index: number) => {
+    setCoFounders(coFounders.filter((_, i) => i !== index))
+  }
+
   const submitLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setApiKeyTouched(true)
@@ -64,7 +105,7 @@ export default function CompanyLogin({ onLoggedIn, onExit }: { onLoggedIn: (c: a
     setLoading(true)
     setError('')
     try {
-      const res = await fetch(`/api/company/auth/me?login=1&apiKey=${encodeURIComponent(apiKey)}`, {
+      const res = await fetch(`/api/company/auth/me?login=1&apiKey=${encodeURIComponent(apiKey.trim())}`, {
         method: 'GET',
         credentials: 'include',
       })
@@ -83,13 +124,26 @@ export default function CompanyLogin({ onLoggedIn, onExit }: { onLoggedIn: (c: a
 
   const submitRegister = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!sectorId || !cityId || !nameValid || !contactNameValid || !contactEmailValid) return
+    if (!sector.trim() || !city.trim() || !nameValid || !contactNameValid || !contactEmailValid) return
     setLoading(true)
     setError('')
     try {
       const r = await api<{ ok: boolean; company: { name: string; apiKey: string } }>('/api/company/register', {
         method: 'POST',
-        body: { name, description, email, phone, website, sectorId, cityId, locationId: locationId || null, contactName, contactEmail, contactPhone },
+        body: {
+          name: name.trim(),
+          description: description.trim() || undefined,
+          email: email.trim() || undefined,
+          phone: phone.trim() || undefined,
+          website: website.trim() || undefined,
+          sectorId: sector.trim(),
+          cityId: city.trim(),
+          address: address.trim() || undefined,
+          contactName: contactName.trim(),
+          contactEmail: contactEmail.trim(),
+          contactPhone: contactPhone.trim() || undefined,
+          founders: coFounders.filter((f) => f.name.trim().length > 0),
+        },
       })
       setSuccess({ name: r.company.name, apiKey: r.company.apiKey })
     } catch (e: any) {
@@ -166,16 +220,12 @@ export default function CompanyLogin({ onLoggedIn, onExit }: { onLoggedIn: (c: a
             SEECS Company Registry · NUST Islamabad
           </div>
         </footer>
-        <style>{`
-          @keyframes checkBounce {
-            0% { transform: scale(0.3); opacity: 0; }
-            50% { transform: scale(1.1); }
-            100% { transform: scale(1); opacity: 1; }
-          }
-        `}</style>
       </div>
     )
   }
+
+  const sectorOptions = (lookup?.sectors || []).map((s) => ({ value: s.id, label: s.name }))
+  const cityOptions = (lookup?.cities || []).map((c) => ({ value: c.id, label: c.name }))
 
   return (
     <div className="min-h-screen flex flex-col relative overflow-hidden">
@@ -185,11 +235,6 @@ export default function CompanyLogin({ onLoggedIn, onExit }: { onLoggedIn: (c: a
         <div className="absolute -top-40 -right-40 h-80 w-80 rounded-full bg-emerald-200/30 dark:bg-emerald-900/20 blur-3xl" />
         <div className="absolute -bottom-40 -left-40 h-80 w-80 rounded-full bg-teal-200/30 dark:bg-teal-900/20 blur-3xl" />
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-[600px] w-[600px] rounded-full bg-emerald-100/20 dark:bg-emerald-900/10 blur-3xl" />
-        {/* Subtle dot pattern */}
-        <div className="absolute inset-0 opacity-[0.03] dark:opacity-[0.02]" style={{
-          backgroundImage: 'radial-gradient(circle, currentColor 1px, transparent 1px)',
-          backgroundSize: '24px 24px'
-        }} />
       </div>
 
       <header className="border-b bg-background/80 backdrop-blur-sm sticky top-0 z-10">
@@ -303,16 +348,18 @@ export default function CompanyLogin({ onLoggedIn, onExit }: { onLoggedIn: (c: a
                 <div>
                   <CardTitle>Register your company</CardTitle>
                   <CardDescription>
-                    Fill in your company details. A unique API key will be generated.
+                    Fill in your company details. Choose from the list or type a new sector/city.
                   </CardDescription>
                 </div>
               </div>
             </CardHeader>
             <CardContent>
-              <form onSubmit={submitRegister} className="space-y-5">
-                {/* Company Info Section */}
+              <form onSubmit={submitRegister} className="space-y-6">
+                {/* 1. Company Info Section */}
                 <div>
-                  <div className="text-xs font-semibold uppercase tracking-wider text-stone-500 dark:text-stone-400 mb-3">Company Information</div>
+                  <div className="text-xs font-semibold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 mb-3 flex items-center gap-1.5">
+                    <Building2 className="h-4 w-4" /> 1. Company Information
+                  </div>
                   <div className="grid sm:grid-cols-2 gap-3">
                     <div className="space-y-1.5 sm:col-span-2">
                       <Label>Company name <span className="text-destructive">*</span></Label>
@@ -323,7 +370,6 @@ export default function CompanyLogin({ onLoggedIn, onExit }: { onLoggedIn: (c: a
                         required
                         className={!nameValid && name.length > 0 ? 'border-destructive' : ''}
                       />
-                      {!nameValid && name.length > 0 && <p className="text-xs text-destructive">Name must be at least 2 characters</p>}
                     </div>
                     <div className="space-y-1.5 sm:col-span-2">
                       <Label>Description</Label>
@@ -332,7 +378,7 @@ export default function CompanyLogin({ onLoggedIn, onExit }: { onLoggedIn: (c: a
                         value={description}
                         onChange={(e) => setDescription(e.target.value)}
                         rows={2}
-                        placeholder="Brief description of your company..."
+                        placeholder="Brief description of products, services, or focus..."
                       />
                     </div>
                     <div className="space-y-1.5">
@@ -351,53 +397,49 @@ export default function CompanyLogin({ onLoggedIn, onExit }: { onLoggedIn: (c: a
                         placeholder="https://company.com"
                         className={!websiteValid && website.length > 0 ? 'border-destructive' : ''}
                       />
-                      {!websiteValid && website.length > 0 && <p className="text-xs text-destructive">Please enter a valid URL</p>}
                     </div>
                     <div className="space-y-1.5">
                       <Label>Sector <span className="text-destructive">*</span></Label>
-                      <select
-                        className={`flex h-9 w-full rounded-md border bg-background px-3 py-1 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 ${!sectorId ? 'border-destructive focus-visible:ring-destructive/30' : 'border-input focus-visible:ring-emerald-500/30'}`}
-                        value={sectorId}
-                        onChange={(e) => setSectorId(e.target.value)}
-                        required
-                      >
-                        <option value="">Select sector…</option>
-                        {lookup?.sectors.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-                      </select>
-                      {!sectorId && <p className="text-xs text-destructive">Sector is required</p>}
+                      <Combobox
+                        options={sectorOptions}
+                        value={sector}
+                        onChange={setSector}
+                        placeholder="Select or type sector..."
+                        searchPlaceholder="Search sectors..."
+                        createLabel="Use new sector"
+                      />
+                      {!sector && <p className="text-[11px] text-muted-foreground">Select from list or type to create a new one.</p>}
                     </div>
                     <div className="space-y-1.5">
                       <Label>City <span className="text-destructive">*</span></Label>
-                      <select
-                        className={`flex h-9 w-full rounded-md border bg-background px-3 py-1 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 ${!cityId ? 'border-destructive focus-visible:ring-destructive/30' : 'border-input focus-visible:ring-emerald-500/30'}`}
-                        value={cityId}
-                        onChange={(e) => setCityId(e.target.value)}
-                        required
-                      >
-                        <option value="">Select city…</option>
-                        {lookup?.cities.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                      </select>
-                      {!cityId && <p className="text-xs text-destructive">City is required</p>}
+                      <Combobox
+                        options={cityOptions}
+                        value={city}
+                        onChange={setCity}
+                        placeholder="Select or type city..."
+                        searchPlaceholder="Search cities..."
+                        createLabel="Use new city"
+                      />
+                      {!city && <p className="text-[11px] text-muted-foreground">Select from list or type to create a new one.</p>}
                     </div>
                     <div className="space-y-1.5 sm:col-span-2">
-                      <Label>Office location (optional)</Label>
-                      <select
-                        className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/30"
-                        value={locationId}
-                        onChange={(e) => setLocationId(e.target.value)}
-                      >
-                        <option value="">— None —</option>
-                        {lookup?.locations.map((l) => <option key={l.id} value={l.id}>{l.address} · {l.city.name}</option>)}
-                      </select>
+                      <Label>Office address (optional)</Label>
+                      <Input
+                        value={address}
+                        onChange={(e) => setAddress(e.target.value)}
+                        placeholder="e.g. Office #402, Software Technology Park, Islamabad"
+                      />
                     </div>
                   </div>
                 </div>
 
                 <Separator />
 
-                {/* Contact Section */}
+                {/* 2. Primary Contact / CEO */}
                 <div>
-                  <div className="text-xs font-semibold uppercase tracking-wider text-stone-500 dark:text-stone-400 mb-3">Primary Contact</div>
+                  <div className="text-xs font-semibold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 mb-3 flex items-center gap-1.5">
+                    <UserPlus className="h-4 w-4" /> 2. Primary Founder / CEO Contact
+                  </div>
                   <div className="grid sm:grid-cols-2 gap-3">
                     <div className="space-y-1.5">
                       <Label>Contact name <span className="text-destructive">*</span></Label>
@@ -408,7 +450,6 @@ export default function CompanyLogin({ onLoggedIn, onExit }: { onLoggedIn: (c: a
                         required
                         className={!contactNameValid && contactName.length > 0 ? 'border-destructive' : ''}
                       />
-                      {!contactNameValid && contactName.length > 0 && <p className="text-xs text-destructive">Name must be at least 2 characters</p>}
                     </div>
                     <div className="space-y-1.5">
                       <Label>Contact email <span className="text-destructive">*</span></Label>
@@ -420,7 +461,6 @@ export default function CompanyLogin({ onLoggedIn, onExit }: { onLoggedIn: (c: a
                         required
                         className={!contactEmailValid && contactEmail.length > 0 ? 'border-destructive' : ''}
                       />
-                      {!contactEmailValid && contactEmail.length > 0 && <p className="text-xs text-destructive">Please enter a valid email</p>}
                     </div>
                     <div className="space-y-1.5 sm:col-span-2">
                       <Label>Contact phone</Label>
@@ -429,13 +469,71 @@ export default function CompanyLogin({ onLoggedIn, onExit }: { onLoggedIn: (c: a
                   </div>
                 </div>
 
+                <Separator />
+
+                {/* 3. Additional Co-Founders (Optional) */}
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="text-xs font-semibold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
+                      <Users className="h-4 w-4" /> 3. Additional Co-Founders (Optional)
+                    </div>
+                    <Button type="button" variant="outline" size="sm" onClick={addCoFounder} className="h-7 text-xs">
+                      <Plus className="h-3.5 w-3.5 mr-1" /> Add co-founder
+                    </Button>
+                  </div>
+
+                  {coFounders.length === 0 ? (
+                    <p className="text-xs text-muted-foreground italic">No additional co-founders added yet. You can also add team members anytime from your company portal.</p>
+                  ) : (
+                    <div className="space-y-3">
+                      {coFounders.map((cf, idx) => (
+                        <div key={idx} className="p-3 border rounded-lg bg-muted/20 space-y-2 relative">
+                          <div className="flex justify-between items-center">
+                            <span className="text-xs font-medium text-muted-foreground">Co-Founder #{idx + 1}</span>
+                            <Button type="button" variant="ghost" size="sm" onClick={() => removeCoFounder(idx)} className="h-6 w-6 p-0 text-destructive">
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                          <div className="grid sm:grid-cols-2 gap-2">
+                            <Input
+                              placeholder="Full name"
+                              value={cf.name}
+                              onChange={(e) => updateCoFounder(idx, 'name', e.target.value)}
+                              className="h-8 text-xs"
+                            />
+                            <Input
+                              placeholder="Role (e.g. CTO, Co-Founder)"
+                              value={cf.role}
+                              onChange={(e) => updateCoFounder(idx, 'role', e.target.value)}
+                              className="h-8 text-xs"
+                            />
+                            <Input
+                              type="email"
+                              placeholder="Email address"
+                              value={cf.email}
+                              onChange={(e) => updateCoFounder(idx, 'email', e.target.value)}
+                              className="h-8 text-xs"
+                            />
+                            <Input
+                              placeholder="SEECS Department / Field"
+                              value={cf.department}
+                              onChange={(e) => updateCoFounder(idx, 'department', e.target.value)}
+                              className="h-8 text-xs"
+                            />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
                 {error && (
                   <Alert variant="destructive">
                     <AlertDescription className="text-sm">{error}</AlertDescription>
                   </Alert>
                 )}
 
-                <div className="flex gap-3 pt-1">
+                <div className="flex gap-3 pt-2">
                   <Button
                     type="button"
                     variant="outline"
@@ -447,7 +545,7 @@ export default function CompanyLogin({ onLoggedIn, onExit }: { onLoggedIn: (c: a
                   <Button
                     type="submit"
                     className="flex-1 bg-emerald-600 hover:bg-emerald-700"
-                    disabled={loading || !sectorId || !cityId || !nameValid || !contactNameValid || !contactEmailValid}
+                    disabled={loading || !sector || !city || !nameValid || !contactNameValid || !contactEmailValid}
                   >
                     {loading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                     Register company
@@ -461,7 +559,7 @@ export default function CompanyLogin({ onLoggedIn, onExit }: { onLoggedIn: (c: a
 
       <footer className="border-t bg-background/80 backdrop-blur-sm mt-auto">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4 text-xs text-muted-foreground text-center">
-          Each company can only see and modify its own data. Misuse of an API key should be reported to the SEECS admin.
+          SEECS Database Management System · NUST Islamabad
         </div>
       </footer>
     </div>

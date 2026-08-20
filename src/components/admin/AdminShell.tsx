@@ -7,13 +7,7 @@ import { Separator } from '@/components/ui/separator'
 import {
   LayoutDashboard,
   Building2,
-  Layers,
-  MapPin,
-  MapPinned,
   Users,
-  GraduationCap,
-  DollarSign,
-  Columns3,
   Bot,
   Settings,
   LogOut,
@@ -24,50 +18,32 @@ import { cn } from '@/lib/utils'
 import { ThemeToggle } from '@/components/theme-toggle'
 import DashboardPage from './pages/DashboardPage'
 import CompaniesPage from './pages/CompaniesPage'
-import SectorsPage from './pages/SectorsPage'
-import CitiesPage from './pages/CitiesPage'
-import LocationsPage from './pages/LocationsPage'
 import FoundersPage from './pages/FoundersPage'
-import DegreesPage from './pages/DegreesPage'
-import AnnualDataPage from './pages/AnnualDataPage'
 import ChatbotPage from './pages/ChatbotPage'
-import SettingsPage from './pages/SettingsPage'
-import CustomColumnsPage from './pages/CustomColumnsPage'
+import MasterSettingsPage from './pages/MasterSettingsPage'
 
 type Tab =
   | 'dashboard'
   | 'companies'
-  | 'sectors'
-  | 'cities'
-  | 'locations'
   | 'founders'
-  | 'degrees'
-  | 'annual'
-  | 'custom-columns'
   | 'chatbot'
   | 'settings'
 
 const NAV: { id: Tab; label: string; icon: React.ReactNode; group: string }[] = [
   { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard className="h-4 w-4" />, group: 'Overview' },
-  { id: 'companies', label: 'Companies', icon: <Building2 className="h-4 w-4" />, group: 'Master Data' },
-  { id: 'founders', label: 'Founders', icon: <Users className="h-4 w-4" />, group: 'Master Data' },
-  { id: 'sectors', label: 'Sectors', icon: <Layers className="h-4 w-4" />, group: 'Master Data' },
-  { id: 'cities', label: 'Cities', icon: <MapPin className="h-4 w-4" />, group: 'Master Data' },
-  { id: 'locations', label: 'Locations', icon: <MapPinned className="h-4 w-4" />, group: 'Master Data' },
-  { id: 'degrees', label: 'Degrees', icon: <GraduationCap className="h-4 w-4" />, group: 'Master Data' },
-  { id: 'annual', label: 'Annual Data', icon: <DollarSign className="h-4 w-4" />, group: 'Master Data' },
-  { id: 'custom-columns', label: 'Custom Columns', icon: <Columns3 className="h-4 w-4" />, group: 'Master Data' },
+  { id: 'companies', label: 'Companies Registry', icon: <Building2 className="h-4 w-4" />, group: 'Directory' },
+  { id: 'founders', label: 'Founders & Alumni', icon: <Users className="h-4 w-4" />, group: 'Directory' },
   { id: 'chatbot', label: 'AI Assistant', icon: <Bot className="h-4 w-4" />, group: 'Tools' },
-  { id: 'settings', label: 'LLM Settings', icon: <Settings className="h-4 w-4" />, group: 'Tools' },
+  { id: 'settings', label: 'Database Settings', icon: <Settings className="h-4 w-4" />, group: 'Configuration' },
 ]
 
 export default function AdminShell({ admin, onLogout }: { admin: any; onLogout: () => void }) {
-  const [tab, setTab] = useState<Tab>('dashboard')
+  const [tab, setTab] = useState<Tab>('companies')
   const [mobileOpen, setMobileOpen] = useState(false)
 
   const groups = Array.from(new Set(NAV.map((n) => n.group)))
-  const currentLabel = NAV.find((n) => n.id === tab)?.label || 'Dashboard'
-  const currentIcon = NAV.find((n) => n.id === tab)?.icon || <LayoutDashboard className="h-4 w-4" />
+  const currentLabel = NAV.find((n) => n.id === tab)?.label || 'Companies Registry'
+  const currentIcon = NAV.find((n) => n.id === tab)?.icon || <Building2 className="h-4 w-4" />
 
   const Sidebar = (
     <div className="flex flex-col h-full">
@@ -108,11 +84,11 @@ export default function AdminShell({ admin, onLogout }: { admin: any; onLogout: 
       <div className="border-t border-stone-800 p-3">
         <div className="flex items-center gap-2.5 px-2 py-2 mb-1">
           <div className="h-9 w-9 rounded-full bg-gradient-to-br from-emerald-400 to-teal-500 text-white grid place-items-center text-xs font-bold shadow-sm">
-            {admin.name?.charAt(0).toUpperCase() || 'A'}
+            {admin?.name?.charAt(0).toUpperCase() || 'A'}
           </div>
           <div className="leading-tight overflow-hidden">
-            <div className="text-sm font-medium text-stone-200 truncate">{admin.name}</div>
-            <div className="text-xs text-stone-500 truncate">{admin.email}</div>
+            <div className="text-sm font-medium text-stone-200 truncate">{admin?.name || 'Admin'}</div>
+            <div className="text-xs text-stone-500 truncate">{admin?.email || 'admin@seecs.nust.edu.pk'}</div>
           </div>
         </div>
         <div className="flex items-center gap-1">
@@ -168,14 +144,8 @@ export default function AdminShell({ admin, onLogout }: { admin: any; onLogout: 
           {tab === 'dashboard' && <DashboardPage />}
           {tab === 'companies' && <CompaniesPage />}
           {tab === 'founders' && <FoundersPage />}
-          {tab === 'sectors' && <SectorsPage />}
-          {tab === 'cities' && <CitiesPage />}
-          {tab === 'locations' && <LocationsPage />}
-          {tab === 'degrees' && <DegreesPage />}
-          {tab === 'annual' && <AnnualDataPage />}
-          {tab === 'custom-columns' && <CustomColumnsPage />}
           {tab === 'chatbot' && <ChatbotPage />}
-          {tab === 'settings' && <SettingsPage />}
+          {tab === 'settings' && <MasterSettingsPage />}
         </main>
       </div>
     </div>

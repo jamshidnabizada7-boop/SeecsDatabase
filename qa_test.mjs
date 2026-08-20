@@ -45,7 +45,7 @@ async function main() {
 
   console.log('\n=== 4. UPDATE KEY ===');
   if (firstId) {
-    const upd = await req('PUT', '/api/admin/companies/' + firstId, { apiKey: 'sk_seecs_node_test_key' }, login.cookie);
+    const upd = await req('PUT', '/api/admin/companies/' + firstId, { apiKey: 'sk_seecs_test_key_' + Date.now() }, login.cookie);
     const updData = JSON.parse(upd.body);
     console.log('  Status:', upd.status, 'New key:', updData.item?.apiKey);
   }
