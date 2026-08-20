@@ -233,7 +233,7 @@ export default function AdminSecurityPage() {
                     id="admin-name"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    placeholder="e.g. Dr. Muhammad Tariq"
+                    placeholder="e.g. Dr. Maajid Maqbool"
                     className="pl-9 text-sm"
                     required
                   />
@@ -249,7 +249,7 @@ export default function AdminSecurityPage() {
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    placeholder="professor@seecs.edu.pk"
+                    placeholder="maajid.maqbool@seecs.edu.pk"
                     className="pl-9 text-sm"
                     required
                   />
