@@ -51,8 +51,16 @@ export default function CompanyLogin({ onLoggedIn, onExit }: { onLoggedIn: (c: a
     setLoading(true)
     setError('')
     try {
-      const r = await api<{ ok: boolean; company: any }>('/api/company/auth/login', { method: 'POST', body: { apiKey } })
-      onLoggedIn(r.company)
+      const res = await fetch(`/api/company/auth/me?login=1&apiKey=${encodeURIComponent(apiKey)}`, {
+        method: 'GET',
+        credentials: 'include',
+      })
+      const data = await res.json()
+      if (res.ok && data.ok && data.company) {
+        onLoggedIn(data.company)
+      } else {
+        setError(data.error || 'Login failed')
+      }
     } catch (e: any) {
       setError(e.message || 'Login failed')
     } finally {
