@@ -9,7 +9,8 @@ function req(method, path, body, cookie) {
       res.on('data', c => data += c);
       res.on('end', () => {
         const sc = res.headers['set-cookie'];
-        resolve({ status: res.statusCode, body: data, cookie: sc ? sc.split(';')[0] : null });
+        const cookieStr = Array.isArray(sc) ? sc[0] : sc;
+        resolve({ status: res.statusCode, body: data, cookie: cookieStr ? cookieStr.split(';')[0] : null });
       });
     });
     r.on('error', reject);
@@ -19,9 +20,12 @@ function req(method, path, body, cookie) {
   });
 }
 
+import crypto from 'crypto';
+
 async function main() {
   console.log('=== 1. LOGIN ===');
-  const login = await req('POST', '/api/admin/auth/login', { email: 'admin@seecs.nust.edu.pk', password: 'admin12345' });
+  const hash = crypto.createHash('sha256').update('admin12345').digest('hex');
+  const login = await req('GET', `/api/admin/auth/me?login=1&email=admin@seecs.nust.edu.pk&hash=${hash}`);
   console.log('  Status:', login.status, 'Admin:', JSON.parse(login.body).admin?.name);
   if (!login.cookie) { console.log('FATAL: no cookie'); return; }
   await new Promise(r => setTimeout(r, 1000));
