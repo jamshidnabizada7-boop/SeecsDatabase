@@ -22,14 +22,14 @@ import FoundersPage from './pages/FoundersPage'
 import ChatbotPage from './pages/ChatbotPage'
 import MasterSettingsPage from './pages/MasterSettingsPage'
 
-type Tab =
+export type AdminTab =
   | 'dashboard'
   | 'companies'
   | 'founders'
   | 'chatbot'
   | 'settings'
 
-const NAV: { id: Tab; label: string; icon: React.ReactNode; group: string }[] = [
+const NAV: { id: AdminTab; label: string; icon: React.ReactNode; group: string }[] = [
   { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard className="h-4 w-4" />, group: 'Overview' },
   { id: 'companies', label: 'Companies Registry', icon: <Building2 className="h-4 w-4" />, group: 'Directory' },
   { id: 'founders', label: 'Founders & Alumni', icon: <Users className="h-4 w-4" />, group: 'Directory' },
@@ -38,12 +38,32 @@ const NAV: { id: Tab; label: string; icon: React.ReactNode; group: string }[] = 
 ]
 
 export default function AdminShell({ admin, onLogout }: { admin: any; onLogout: () => void }) {
-  const [tab, setTab] = useState<Tab>('companies')
+  const [tab, setTab] = useState<AdminTab>('dashboard')
   const [mobileOpen, setMobileOpen] = useState(false)
+  const [initialCreateCompany, setInitialCreateCompany] = useState(false)
+  const [initialSearchCompany, setInitialSearchCompany] = useState('')
+  const [initialSettingsTab, setInitialSettingsTab] = useState<string | undefined>(undefined)
+
+  const handleNavigate = (
+    targetTab: AdminTab,
+    options?: { openCreate?: boolean; search?: string; settingsTab?: string }
+  ) => {
+    setTab(targetTab)
+    if (options?.openCreate !== undefined) {
+      setInitialCreateCompany(options.openCreate)
+    }
+    if (options?.search !== undefined) {
+      setInitialSearchCompany(options.search)
+    }
+    if (options?.settingsTab) {
+      setInitialSettingsTab(options.settingsTab)
+    }
+    setMobileOpen(false)
+  }
 
   const groups = Array.from(new Set(NAV.map((n) => n.group)))
-  const currentLabel = NAV.find((n) => n.id === tab)?.label || 'Companies Registry'
-  const currentIcon = NAV.find((n) => n.id === tab)?.icon || <Building2 className="h-4 w-4" />
+  const currentLabel = NAV.find((n) => n.id === tab)?.label || 'Dashboard'
+  const currentIcon = NAV.find((n) => n.id === tab)?.icon || <LayoutDashboard className="h-4 w-4" />
 
   const Sidebar = (
     <div className="flex flex-col h-full">
@@ -65,7 +85,7 @@ export default function AdminShell({ admin, onLogout }: { admin: any; onLogout: 
               {NAV.filter((n) => n.group === g).map((n) => (
                 <button
                   key={n.id}
-                  onClick={() => { setTab(n.id); setMobileOpen(false) }}
+                  onClick={() => handleNavigate(n.id)}
                   className={cn(
                     'w-full flex items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium transition-all text-left relative',
                     tab === n.id
@@ -141,11 +161,17 @@ export default function AdminShell({ admin, onLogout }: { admin: any; onLogout: 
               </span>
             </div>
           </div>
-          {tab === 'dashboard' && <DashboardPage />}
-          {tab === 'companies' && <CompaniesPage />}
+          {tab === 'dashboard' && <DashboardPage onNavigate={handleNavigate} />}
+          {tab === 'companies' && (
+            <CompaniesPage
+              initialCreate={initialCreateCompany}
+              initialSearch={initialSearchCompany}
+              onResetInitialCreate={() => setInitialCreateCompany(false)}
+            />
+          )}
           {tab === 'founders' && <FoundersPage />}
           {tab === 'chatbot' && <ChatbotPage />}
-          {tab === 'settings' && <MasterSettingsPage />}
+          {tab === 'settings' && <MasterSettingsPage defaultTab={initialSettingsTab || 'custom-columns'} />}
         </main>
       </div>
     </div>

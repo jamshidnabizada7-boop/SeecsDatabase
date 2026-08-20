@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import {
   Building2, Users, DollarSign, Briefcase, Loader2, RefreshCw, Activity,
-  Plus, Download, ExternalLink, Columns3, MapPin, TrendingUp, ArrowUpRight, User
+  Plus, Download, ExternalLink, Columns3, MapPin, TrendingUp, ArrowUpRight, User, ChevronRight
 } from 'lucide-react'
 import {
   ChartContainer,
@@ -16,6 +16,7 @@ import {
   type ChartConfig,
 } from '@/components/ui/chart'
 import { Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, XAxis, YAxis, Line, LineChart, Area, AreaChart, LabelList } from 'recharts'
+import { AdminTab } from '../AdminShell'
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -61,8 +62,8 @@ function useCountUp(target: number, duration = 1200) {
       if (!running) return
       const elapsed = performance.now() - start
       const progress = Math.min(elapsed / duration, 1)
-      const eased = 1 - Math.pow(1 - progress, 3)
-      setDisplay(Math.round(eased * target))
+      const easeOut = 1 - Math.pow(1 - progress, 3)
+      setDisplay(Math.round(easeOut * target))
       if (progress < 1) {
         rafRef.current = requestAnimationFrame(tick)
       }
@@ -96,7 +97,6 @@ const GENDER_COLORS: Record<string, string> = {
   Other: '#9CA3AF',
 }
 
-// Emerald-to-teal palette for multi-color charts
 const EMERALD_PALETTE = [
   '#047857', '#059669', '#10B981', '#34D399', '#6EE7B7',
   '#0F766E', '#0D9488', '#14B8A6', '#2DD4BF', '#5EEAD4',
@@ -107,7 +107,11 @@ const EMERALD_PALETTE = [
 /*  Main Component                                                     */
 /* ------------------------------------------------------------------ */
 
-export default function DashboardPage() {
+export default function DashboardPage({
+  onNavigate,
+}: {
+  onNavigate?: (tab: AdminTab, options?: { openCreate?: boolean; search?: string; settingsTab?: string }) => void
+}) {
   const [stats, setStats] = useState<Stats | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -158,42 +162,61 @@ export default function DashboardPage() {
   }
   if (!stats) return null
 
-  /* ---- derived data ---- */
-  const cityChartData = [...stats.byCity].sort((a, b) => b.companies - a.companies)
-
-  const sectorTop10 = [...stats.bySector]
-    .sort((a, b) => b.companies - a.companies)
-    .slice(0, 10)
-
-  const genderData = stats.byGender.map((g) => ({
-    ...g,
-    fill: GENDER_COLORS[g.name] || g.color || '#9CA3AF',
+  /* ---- chart data preparation ---- */
+  const cityChartData = stats.byCity.map((c) => ({
+    city: c.name,
+    companies: c.companies,
   }))
-  const genderTotal = genderData.reduce((s, g) => s + g.value, 0)
 
-  /* ---- chart configs ---- */
   const cityChartConfig: ChartConfig = {
     companies: { label: 'Companies', color: '#10B981' },
   }
 
-  const genderChartConfig: ChartConfig = {}
-  genderData.forEach((g) => {
-    genderChartConfig[g.name] = { label: g.name, color: g.fill }
-  })
+  const genderChartData = stats.byGender.map((g) => ({
+    name: g.name,
+    value: g.value,
+    fill: GENDER_COLORS[g.name] || '#6B7280',
+  }))
 
-  const degreeChartConfig: ChartConfig = {
-    value: { label: 'Founders', color: '#0D9488' },
+  const genderChartConfig: ChartConfig = {
+    Male: { label: 'Male', color: '#3B82F6' },
+    Female: { label: 'Female', color: '#EC4899' },
+    Other: { label: 'Other', color: '#9CA3AF' },
   }
+
+  const sectorChartData = stats.bySector.slice(0, 10).map((s, idx) => ({
+    sector: s.name.length > 22 ? s.name.slice(0, 20) + '…' : s.name,
+    fullSector: s.name,
+    companies: s.companies,
+    fill: EMERALD_PALETTE[idx % EMERALD_PALETTE.length],
+  }))
 
   const sectorChartConfig: ChartConfig = {
     companies: { label: 'Companies', color: '#059669' },
   }
 
+  const revenueChartData = stats.topCompaniesByRevenue.map((c) => ({
+    company: c.name.length > 18 ? c.name.slice(0, 16) + '…' : c.name,
+    fullCompany: c.name,
+    revenue: c.revenue,
+    sector: c.sector,
+  }))
+
   const revenueChartConfig: ChartConfig = {
-    revenue: { label: 'Revenue', color: 'hsl(160 84% 39%)' },
+    revenue: { label: 'Revenue (PKR)', color: '#F59E0B' },
   }
-  const trendChartConfig: ChartConfig = {
-    value: { label: 'Avg Monthly Revenue', color: 'hsl(38 92% 50%)' },
+
+  const yearChartData = stats.byYear.map((y) => ({
+    year: String(y.year),
+    revenue: y.revenue,
+    employees: y.employees,
+    projects: y.projects,
+  }))
+
+  const yearChartConfig: ChartConfig = {
+    revenue: { label: 'Revenue', color: '#10B981' },
+    employees: { label: 'Employees', color: '#3B82F6' },
+    projects: { label: 'Projects', color: '#8B5CF6' },
   }
 
   return (
@@ -212,45 +235,54 @@ export default function DashboardPage() {
 
       {/* ---- KPI Cards ---- */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <AnimatedKpiCard
-          title="Companies"
-          target={stats.totalCompanies}
-          icon={<Building2 className="h-5 w-5" />}
-          hint={`${stats.totalSectors} sectors · ${stats.totalCities} cities`}
-          trend={`${stats.totalCities} cities covered`}
-          gradient="from-emerald-500 to-emerald-600"
-        />
-        <AnimatedKpiCard
-          title="Revenue (all years)"
-          target={stats.totalRevenueAllTime}
-          icon={<DollarSign className="h-5 w-5" />}
-          hint={`avg monthly ${formatCurrency(stats.avgMonthlyRevenue)}`}
-          trend={stats.totalCompanies > 0 ? `${formatCurrency(Math.round(stats.totalRevenueAllTime / stats.totalCompanies))}/company` : ''}
-          gradient="from-amber-500 to-amber-600"
-          formatValue={(v) => formatCurrency(v)}
-        />
-        <AnimatedKpiCard
-          title="Founders"
-          target={stats.totalFounders}
-          icon={<Users className="h-5 w-5" />}
-          hint={`${stats.femaleFounders} female · ${stats.maleFounders} male`}
-          trend={stats.totalCompanies > 0 ? `${(stats.totalFounders / stats.totalCompanies).toFixed(1)} avg per company` : ''}
-          gradient="from-sky-500 to-sky-600"
-        />
-        <AnimatedKpiCard
-          title="Projects Tracked"
-          target={stats.totalProjects}
-          icon={<Briefcase className="h-5 w-5" />}
-          hint={`${stats.totalEmployees} employees · ${stats.totalAnnualRecords} records`}
-          trend={`${stats.totalDegrees} degree fields`}
-          gradient="from-violet-500 to-violet-600"
-        />
+        <div onClick={() => onNavigate?.('companies')} className="cursor-pointer">
+          <AnimatedKpiCard
+            title="Companies"
+            target={stats.totalCompanies}
+            icon={<Building2 className="h-5 w-5" />}
+            hint={`${stats.totalSectors} sectors · ${stats.totalCities} cities`}
+            trend={`${stats.totalCities} cities covered`}
+            gradient="from-emerald-500 to-emerald-600"
+          />
+        </div>
+        <div onClick={() => onNavigate?.('companies')} className="cursor-pointer">
+          <AnimatedKpiCard
+            title="Revenue (all years)"
+            target={stats.totalRevenueAllTime}
+            icon={<DollarSign className="h-5 w-5" />}
+            hint={`avg monthly ${formatCurrency(stats.avgMonthlyRevenue)}`}
+            trend={stats.totalCompanies > 0 ? `${formatCurrency(Math.round(stats.totalRevenueAllTime / stats.totalCompanies))}/company` : ''}
+            gradient="from-amber-500 to-amber-600"
+            formatValue={(v) => formatCurrency(v)}
+          />
+        </div>
+        <div onClick={() => onNavigate?.('founders')} className="cursor-pointer">
+          <AnimatedKpiCard
+            title="Founders"
+            target={stats.totalFounders}
+            icon={<Users className="h-5 w-5" />}
+            hint={`${stats.femaleFounders} female · ${stats.maleFounders} male`}
+            trend={stats.totalCompanies > 0 ? `${(stats.totalFounders / stats.totalCompanies).toFixed(1)} avg per company` : ''}
+            gradient="from-sky-500 to-sky-600"
+          />
+        </div>
+        <div onClick={() => onNavigate?.('companies')} className="cursor-pointer">
+          <AnimatedKpiCard
+            title="Projects Tracked"
+            target={stats.totalProjects}
+            icon={<Briefcase className="h-5 w-5" />}
+            hint={`${stats.totalEmployees} employees · ${stats.totalAnnualRecords} records`}
+            trend={`${stats.totalDegrees} degree fields`}
+            gradient="from-violet-500 to-violet-600"
+          />
+        </div>
       </div>
 
       {/* ---- Quick Actions ---- */}
       <div className="flex flex-wrap gap-3">
         <Button
           variant="outline"
+          onClick={() => onNavigate?.('companies', { openCreate: true })}
           className="border-emerald-300 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800 dark:border-emerald-700 dark:text-emerald-400 dark:hover:bg-emerald-950 dark:hover:text-emerald-300"
         >
           <Plus className="h-4 w-4 mr-2" />
@@ -266,13 +298,15 @@ export default function DashboardPage() {
         </Button>
         <Button
           variant="outline"
-          className="border-emerald-300 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800 dark:border-emerald-700 dark:text-emerald-400 dark:hover:bg-emerald-950 dark:hover:text-emerald-300"
+          onClick={() => onNavigate?.('companies')}
+          className="border-emerald-300 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800 dark:border-emerald-700 dark:text-emerald-400 dark:hover:bg-emerald-950 dark:hover:text-emerald-300 font-medium shadow-sm"
         >
           <ExternalLink className="h-4 w-4 mr-2" />
           View All Companies
         </Button>
         <Button
           variant="outline"
+          onClick={() => onNavigate?.('settings', { settingsTab: 'custom-columns' })}
           className="border-emerald-300 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800 dark:border-emerald-700 dark:text-emerald-400 dark:hover:bg-emerald-950 dark:hover:text-emerald-300"
         >
           <Columns3 className="h-4 w-4 mr-2" />
@@ -298,26 +332,29 @@ export default function DashboardPage() {
                 layout="vertical"
                 margin={{ left: 0, right: 48, top: 5, bottom: 5 }}
               >
-                <CartesianGrid horizontal={false} strokeDasharray="3 3" className="stroke-muted" />
-                <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
+                <CartesianGrid horizontal={false} strokeDasharray="3 3" />
+                <XAxis type="number" tickLine={false} axisLine={false} allowDecimals={false} />
                 <YAxis
                   type="category"
-                  dataKey="name"
-                  tick={{ fontSize: 12 }}
+                  dataKey="city"
                   tickLine={false}
                   axisLine={false}
-                  width={100}
+                  width={90}
+                  tick={{ fontSize: 12 }}
                 />
-                <ChartTooltip content={<ChartTooltipContent />} />
-                <Bar dataKey="companies" fill="var(--color-companies)" radius={[0, 4, 4, 0]}>
-                  <LabelList dataKey="companies" position="right" style={{ fontSize: 12, fontWeight: 600, fill: '#374151' }} />
+                <ChartTooltip
+                  cursor={false}
+                  content={<ChartTooltipContent indicator="line" />}
+                />
+                <Bar dataKey="companies" fill="#10B981" radius={[0, 4, 4, 0]}>
+                  <LabelList dataKey="companies" position="right" offset={8} className="fill-foreground text-xs" />
                 </Bar>
               </BarChart>
             </ChartContainer>
           </CardContent>
         </Card>
 
-        {/* ---- Gender Distribution (donut) ---- */}
+        {/* ---- Gender Distribution (donut chart) ---- */}
         <Card>
           <CardHeader>
             <CardTitle className="text-base flex items-center gap-2">
@@ -326,236 +363,232 @@ export default function DashboardPage() {
             </CardTitle>
             <CardDescription>Founders grouped by gender identity.</CardDescription>
           </CardHeader>
-          <CardContent>
-            <div className="flex flex-col items-center">
-              <ChartContainer config={genderChartConfig} className="h-[220px] w-[220px]">
-                <PieChart>
-                  <ChartTooltip content={<ChartTooltipContent nameKey="name" />} />
-                  <Pie
-                    data={genderData}
-                    dataKey="value"
-                    nameKey="name"
-                    innerRadius={55}
-                    outerRadius={90}
-                    paddingAngle={3}
-                    strokeWidth={0}
-                  >
-                    {genderData.map((entry) => (
-                      <Cell key={entry.name} fill={entry.fill} />
-                    ))}
-                    <LabelList
-                      dataKey="value"
-                      position="outside"
-                      formatter={(v: number) => `${genderTotal ? Math.round((v / genderTotal) * 100) : 0}%`}
-                      style={{ fontSize: 12, fontWeight: 600 }}
-                    />
-                  </Pie>
-                </PieChart>
-              </ChartContainer>
-              {/* Legend */}
-              <div className="flex items-center gap-6 mt-3">
-                {genderData.map((g) => (
-                  <div key={g.name} className="flex items-center gap-2">
-                    <span className="h-3 w-3 rounded-full shrink-0" style={{ backgroundColor: g.fill }} />
-                    <span className="text-sm text-stone-600">{g.name}</span>
-                    <span className="text-sm font-semibold text-stone-800">
-                      {g.value} ({genderTotal ? Math.round((g.value / genderTotal) * 100) : 0}%)
-                    </span>
+          <CardContent className="flex flex-col items-center justify-center">
+            <ChartContainer config={genderChartConfig} className="h-[250px] w-full">
+              <PieChart>
+                <ChartTooltip
+                  cursor={false}
+                  content={<ChartTooltipContent hideLabel />}
+                />
+                <Pie
+                  data={genderChartData}
+                  dataKey="value"
+                  nameKey="name"
+                  innerRadius={65}
+                  outerRadius={95}
+                  paddingAngle={3}
+                  label={({ name, percent }: { name?: string; percent?: number }) => `${name ?? ''} ${(Number(percent ?? 0) * 100).toFixed(0)}%`}
+                >
+                  {genderChartData.map((entry) => (
+                    <Cell key={entry.name} fill={entry.fill} />
+                  ))}
+                </Pie>
+              </PieChart>
+            </ChartContainer>
+            {/* Custom Legend with percentages */}
+            <div className="flex flex-wrap justify-center gap-4 mt-2 text-xs">
+              {stats.byGender.map((g) => {
+                const pct = stats.totalFounders > 0 ? Math.round((g.value / stats.totalFounders) * 100) : 0
+                return (
+                  <div key={g.name} className="flex items-center gap-1.5">
+                    <div className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: GENDER_COLORS[g.name] || '#6B7280' }} />
+                    <span className="text-muted-foreground">{g.name}:</span>
+                    <span className="font-semibold">{g.value}</span>
+                    <span className="text-stone-400">({pct}%)</span>
                   </div>
-                ))}
-              </div>
+                )
+              })}
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Charts Row 2: Degree Field & Sector Distribution */}
+      {/* Charts Row 2: Sector Distribution, Top Companies by Revenue */}
       <div className="grid gap-4 lg:grid-cols-2">
-        {/* ---- Degree Field Distribution (vertical bar) ---- */}
+        {/* ---- Sector Distribution (horizontal bar) ---- */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Degree Field Distribution</CardTitle>
-            <CardDescription>Academic backgrounds of registered founders.</CardDescription>
+            <CardTitle className="text-base flex items-center gap-2">
+              <Building2 className="h-4 w-4 text-emerald-600" />
+              Top Sectors
+            </CardTitle>
+            <CardDescription>Top 10 sectors by number of registered companies.</CardDescription>
           </CardHeader>
           <CardContent>
-            <ChartContainer config={degreeChartConfig} className="h-[300px] w-full">
+            <ChartContainer config={sectorChartConfig} className="h-[320px] w-full">
               <BarChart
-                data={stats.byDegreeField}
-                margin={{ left: 0, right: 8, top: 20, bottom: 0 }}
+                data={sectorChartData}
+                layout="vertical"
+                margin={{ left: 0, right: 48, top: 5, bottom: 5 }}
               >
-                <CartesianGrid vertical={false} strokeDasharray="3 3" className="stroke-muted" />
-                <XAxis
-                  dataKey="name"
+                <CartesianGrid horizontal={false} strokeDasharray="3 3" />
+                <XAxis type="number" tickLine={false} axisLine={false} allowDecimals={false} />
+                <YAxis
+                  type="category"
+                  dataKey="sector"
                   tickLine={false}
                   axisLine={false}
-                  tickMargin={8}
-                  interval={0}
-                  angle={-20}
-                  height={60}
-                  textAnchor="end"
+                  width={130}
                   tick={{ fontSize: 11 }}
                 />
-                <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 11 }} allowDecimals={false} />
-                <ChartTooltip content={<ChartTooltipContent />} />
-                <Bar dataKey="value" radius={[4, 4, 0, 0]}>
-                  {stats.byDegreeField.map((_, i) => (
-                    <Cell key={`deg-${i}`} fill={EMERALD_PALETTE[i % EMERALD_PALETTE.length]} />
+                <ChartTooltip
+                  cursor={false}
+                  content={({ active, payload }) => {
+                    if (!active || !payload?.length) return null
+                    const data = payload[0].payload
+                    return (
+                      <div className="rounded-lg border bg-background p-2 shadow-sm text-xs">
+                        <div className="font-semibold">{data.fullSector}</div>
+                        <div className="text-muted-foreground mt-1">Companies: <span className="font-medium text-foreground">{data.companies}</span></div>
+                      </div>
+                    )
+                  }}
+                />
+                <Bar dataKey="companies" radius={[0, 4, 4, 0]}>
+                  {sectorChartData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.fill} />
                   ))}
-                  <LabelList dataKey="value" position="top" style={{ fontSize: 12, fontWeight: 600, fill: '#374151' }} />
+                  <LabelList dataKey="companies" position="right" offset={8} className="fill-foreground text-xs" />
                 </Bar>
               </BarChart>
             </ChartContainer>
           </CardContent>
         </Card>
 
-        {/* ---- Sector Distribution — Top 10 (horizontal bar) ---- */}
+        {/* ---- Top Companies by Revenue ---- */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Top 10 Sectors</CardTitle>
-            <CardDescription>Sectors ranked by number of registered companies.</CardDescription>
+            <CardTitle className="text-base flex items-center gap-2">
+              <TrendingUp className="h-4 w-4 text-amber-500" />
+              Top Companies by Revenue
+            </CardTitle>
+            <CardDescription>Leading enterprises ranked by total declared revenue.</CardDescription>
           </CardHeader>
           <CardContent>
-            <ChartContainer config={sectorChartConfig} className="h-[300px] w-full">
-              <BarChart
-                data={sectorTop10}
-                layout="vertical"
-                margin={{ left: 0, right: 48, top: 5, bottom: 5 }}
-              >
-                <CartesianGrid horizontal={false} strokeDasharray="3 3" className="stroke-muted" />
-                <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
-                <YAxis
-                  type="category"
-                  dataKey="name"
-                  tick={{ fontSize: 11 }}
-                  tickLine={false}
-                  axisLine={false}
-                  width={120}
-                />
-                <ChartTooltip content={<ChartTooltipContent />} />
-                <Bar dataKey="companies" radius={[0, 4, 4, 0]}>
-                  {sectorTop10.map((_, i) => (
-                    <Cell
-                      key={`sec-${i}`}
-                      fill={EMERALD_PALETTE[i % EMERALD_PALETTE.length]}
+            {revenueChartData.length === 0 ? (
+              <div className="h-[320px] flex items-center justify-center text-sm text-muted-foreground">
+                No revenue data recorded yet.
+              </div>
+            ) : (
+              <ChartContainer config={revenueChartConfig} className="h-[320px] w-full">
+                <BarChart
+                  data={revenueChartData}
+                  layout="vertical"
+                  margin={{ left: 0, right: 60, top: 5, bottom: 5 }}
+                >
+                  <CartesianGrid horizontal={false} strokeDasharray="3 3" />
+                  <XAxis
+                    type="number"
+                    tickLine={false}
+                    axisLine={false}
+                    tickFormatter={(v) => formatCurrency(v)}
+                  />
+                  <YAxis
+                    type="category"
+                    dataKey="company"
+                    tickLine={false}
+                    axisLine={false}
+                    width={110}
+                    tick={{ fontSize: 11 }}
+                  />
+                  <ChartTooltip
+                    cursor={false}
+                    content={({ active, payload }) => {
+                      if (!active || !payload?.length) return null
+                      const data = payload[0].payload
+                      return (
+                        <div className="rounded-lg border bg-background p-2 shadow-sm text-xs">
+                          <div className="font-semibold">{data.fullCompany}</div>
+                          <div className="text-stone-500">{data.sector}</div>
+                          <div className="text-emerald-600 font-semibold mt-1">
+                            {formatCurrency(data.revenue)}
+                          </div>
+                        </div>
+                      )
+                    }}
+                  />
+                  <Bar dataKey="revenue" fill="#F59E0B" radius={[0, 4, 4, 0]}>
+                    <LabelList
+                      dataKey="revenue"
+                      position="right"
+                      offset={8}
+                      formatter={(v: any) => formatCurrency(Number(v))}
+                      className="fill-foreground text-xs"
                     />
-                  ))}
-                  <LabelList dataKey="companies" position="right" style={{ fontSize: 12, fontWeight: 600, fill: '#374151' }} />
-                </Bar>
-              </BarChart>
-            </ChartContainer>
+                  </Bar>
+                </BarChart>
+              </ChartContainer>
+            )}
           </CardContent>
         </Card>
       </div>
 
-      {/* Charts Row 3: Financial Trends */}
-      <div className="grid gap-4 lg:grid-cols-2">
-        {/* Annual revenue trend */}
+      {/* ---- Year-over-Year Growth (Multi-metric line chart) ---- */}
+      {yearChartData.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Annual Revenue Trend</CardTitle>
-            <CardDescription>Total revenue recorded per year (PKR).</CardDescription>
+            <CardTitle className="text-base flex items-center gap-2">
+              <Activity className="h-4 w-4 text-emerald-600" />
+              Annual Growth Trends
+            </CardTitle>
+            <CardDescription>Year-over-year revenue, employee count, and project volume.</CardDescription>
           </CardHeader>
           <CardContent>
-            <ChartContainer config={revenueChartConfig} className="h-[260px] w-full">
-              <AreaChart
-                data={stats.byYear.map((y) => ({ year: String(y.year), revenue: y.revenue }))}
-                margin={{ left: 8, right: 8, top: 8, bottom: 0 }}
-              >
-                <defs>
-                  <linearGradient id="fillRevenue" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="var(--color-revenue)" stopOpacity={0.5} />
-                    <stop offset="100%" stopColor="var(--color-revenue)" stopOpacity={0.05} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid vertical={false} strokeDasharray="3 3" className="stroke-muted" />
-                <XAxis dataKey="year" tickLine={false} axisLine={false} tickMargin={8} tick={{ fontSize: 11 }} />
-                <YAxis
-                  tickFormatter={(v) => formatCurrency(v).replace('PKR ', '')}
-                  tickLine={false}
-                  axisLine={false}
-                  tick={{ fontSize: 11 }}
-                  width={50}
+            <ChartContainer config={yearChartConfig} className="h-[280px] w-full">
+              <LineChart data={yearChartData} margin={{ left: 10, right: 10, top: 10, bottom: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="year" tickLine={false} axisLine={false} />
+                <YAxis yAxisId="left" tickLine={false} axisLine={false} tickFormatter={(v) => formatCurrency(v)} />
+                <YAxis yAxisId="right" orientation="right" tickLine={false} axisLine={false} />
+                <ChartTooltip content={<ChartTooltipContent />} />
+                <Line
+                  yAxisId="left"
+                  type="monotone"
+                  dataKey="revenue"
+                  stroke="#10B981"
+                  strokeWidth={2.5}
+                  dot={{ r: 4, fill: '#10B981' }}
+                  name="Revenue"
                 />
-                <ChartTooltip content={<ChartTooltipContent formatter={(v: any) => formatCurrency(Number(v))} />} />
-                <Area dataKey="revenue" stroke="var(--color-revenue)" fill="url(#fillRevenue)" strokeWidth={2} />
-              </AreaChart>
-            </ChartContainer>
-          </CardContent>
-        </Card>
-
-        {/* Avg monthly revenue trend */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Average Monthly Revenue</CardTitle>
-            <CardDescription>Per-month average across all annual records.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ChartContainer config={trendChartConfig} className="h-[260px] w-full">
-              <LineChart data={stats.monthlyTrend} margin={{ left: 8, right: 8, top: 8, bottom: 0 }}>
-                <CartesianGrid vertical={false} strokeDasharray="3 3" className="stroke-muted" />
-                <XAxis dataKey="month" tickLine={false} axisLine={false} tickMargin={8} tick={{ fontSize: 11 }} />
-                <YAxis
-                  tickFormatter={(v) => formatCurrency(v).replace('PKR ', '')}
-                  tickLine={false}
-                  axisLine={false}
-                  tick={{ fontSize: 11 }}
-                  width={50}
+                <Line
+                  yAxisId="right"
+                  type="monotone"
+                  dataKey="employees"
+                  stroke="#3B82F6"
+                  strokeWidth={2}
+                  dot={{ r: 3, fill: '#3B82F6' }}
+                  name="Employees"
                 />
-                <ChartTooltip content={<ChartTooltipContent formatter={(v: any) => formatCurrency(Number(v))} />} />
-                <Line dataKey="value" stroke="var(--color-value)" strokeWidth={2} dot={{ r: 3 }} />
+                <Line
+                  yAxisId="right"
+                  type="monotone"
+                  dataKey="projects"
+                  stroke="#8B5CF6"
+                  strokeWidth={2}
+                  dot={{ r: 3, fill: '#8B5CF6' }}
+                  name="Projects"
+                />
               </LineChart>
             </ChartContainer>
           </CardContent>
         </Card>
-      </div>
-
-      {/* ================================================================
-          TOP COMPANIES BY REVENUE
-          ================================================================ */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Top Companies by Revenue</CardTitle>
-          <CardDescription>Cumulative revenue across all recorded years.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {stats.topCompaniesByRevenue.map((c, i) => {
-              const max = stats.topCompaniesByRevenue[0]?.revenue || 1
-              const pct = Math.max(8, Math.round((c.revenue / max) * 100))
-              return (
-                <div
-                  key={c.name}
-                  className="flex items-center gap-3 p-3 rounded-lg border bg-card hover:bg-muted/30 transition-colors"
-                >
-                  <span className="text-sm font-bold w-6 text-center text-stone-400">#{i + 1}</span>
-                  <div className="flex-1 min-w-0">
-                    <div className="font-medium text-sm truncate text-stone-800">{c.name}</div>
-                    <div className="text-xs text-stone-500 mb-1.5">{c.sector}</div>
-                    <div className="h-1.5 rounded-full bg-muted overflow-hidden">
-                      <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${pct}%` }} />
-                    </div>
-                  </div>
-                  <span className="text-xs font-semibold text-stone-700 whitespace-nowrap">{formatCurrency(c.revenue)}</span>
-                </div>
-              )
-            })}
-            {stats.topCompaniesByRevenue.length === 0 && (
-              <div className="text-sm text-muted-foreground text-center py-8 col-span-full">No revenue data yet.</div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+      )}
 
       {/* ================================================================
           RECENT ACTIVITY
           ================================================================ */}
       <Card>
-        <CardHeader>
-          <CardTitle className="text-base flex items-center gap-2">
-            <Activity className="h-4 w-4 text-emerald-600" />
-            Recent Activity
-          </CardTitle>
-          <CardDescription>Latest 8 registered companies and their current status.</CardDescription>
+        <CardHeader className="flex flex-row items-center justify-between pb-2">
+          <div>
+            <CardTitle className="text-base flex items-center gap-2">
+              <Activity className="h-4 w-4 text-emerald-600" />
+              Recent Activity
+            </CardTitle>
+            <CardDescription>Latest registered companies and their current status.</CardDescription>
+          </div>
+          <Button variant="ghost" size="sm" onClick={() => onNavigate?.('companies')} className="text-xs text-emerald-600 hover:text-emerald-700">
+            View all companies <ChevronRight className="h-3.5 w-3.5 ml-1" />
+          </Button>
         </CardHeader>
         <CardContent>
           <div className="divide-y divide-border">
@@ -565,15 +598,17 @@ export default function DashboardPage() {
               return (
                 <div
                   key={c.id}
-                  className="flex items-center justify-between gap-3 py-3 first:pt-0 last:pb-0 group hover:bg-muted/30 -mx-2 px-2 rounded-md transition-colors"
+                  onClick={() => onNavigate?.('companies', { search: c.name })}
+                  className="flex items-center justify-between gap-3 py-3 first:pt-0 last:pb-0 group hover:bg-muted/40 -mx-2 px-2 rounded-md transition-colors cursor-pointer"
                 >
                   <div className="flex items-center gap-3 min-w-0">
-                    {/* Index circle */}
-                    <div className="h-9 w-9 rounded-full bg-emerald-50 dark:bg-emerald-950 grid place-items-center shrink-0 border border-emerald-200 dark:border-emerald-800">
+                    <div className="h-9 w-9 rounded-full bg-emerald-50 dark:bg-emerald-950 grid place-items-center shrink-0 border border-emerald-200 dark:border-emerald-800 group-hover:scale-105 transition-transform">
                       <span className="text-xs font-bold text-emerald-700 dark:text-emerald-300">{i + 1}</span>
                     </div>
                     <div className="min-w-0">
-                      <div className="font-medium text-sm truncate text-stone-800 dark:text-stone-200">{c.name}</div>
+                      <div className="font-medium text-sm truncate text-stone-800 dark:text-stone-200 group-hover:text-emerald-600 transition-colors">
+                        {c.name}
+                      </div>
                       <div className="flex items-center gap-1.5 text-xs text-stone-500 mt-0.5">
                         <span className="truncate">{c.sector}</span>
                         <span>·</span>
@@ -586,9 +621,12 @@ export default function DashboardPage() {
                       </div>
                     </div>
                   </div>
-                  <Badge variant="outline" className={`text-xs shrink-0 ${statusClass}`}>
-                    {statusLabel}
-                  </Badge>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline" className={`text-xs shrink-0 ${statusClass}`}>
+                      {statusLabel}
+                    </Badge>
+                    <ChevronRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                  </div>
                 </div>
               )
             })}
@@ -627,9 +665,8 @@ function AnimatedKpiCard({
   const displayValue = formatValue ? formatValue(count) : formatNumber(count)
 
   return (
-    <Card className="overflow-hidden border-0 shadow-md hover:shadow-xl hover:-translate-y-1 transition-all duration-300 cursor-default">
+    <Card className="overflow-hidden border-0 shadow-md hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
       <CardContent className={`p-5 bg-gradient-to-br ${gradient} text-white relative`}>
-        {/* Decorative circles */}
         <div className="absolute -right-4 -top-4 h-24 w-24 rounded-full bg-white/10" />
         <div className="absolute -right-2 bottom-0 h-16 w-16 rounded-full bg-white/5" />
         <div className="relative z-10">

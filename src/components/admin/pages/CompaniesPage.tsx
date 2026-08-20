@@ -151,20 +151,42 @@ const STATUS_STYLES: Record<string, string> = {
 
 type ViewMode = 'card' | 'table'
 
-export default function CompaniesPage() {
+export default function CompaniesPage({
+  initialCreate = false,
+  initialSearch = '',
+  onResetInitialCreate,
+}: {
+  initialCreate?: boolean
+  initialSearch?: string
+  onResetInitialCreate?: () => void
+} = {}) {
   const [items, setItems] = useState<Company[]>([])
   const [customColumns, setCustomColumns] = useState<CustomColumn[]>([])
   const [lookup, setLookup] = useState<Lookup | null>(null)
   const [loading, setLoading] = useState(true)
-  const [search, setSearch] = useState('')
+  const [search, setSearch] = useState(initialSearch)
   const [statusFilter, setStatusFilter] = useState('All')
   const [sectorFilter, setSectorFilter] = useState('All')
   const [cityFilter, setCityFilter] = useState('All')
   const [editing, setEditing] = useState<Company | null>(null)
-  const [creating, setCreating] = useState(false)
+  const [creating, setCreating] = useState(initialCreate)
   const [deleting, setDeleting] = useState<Company | null>(null)
   const [revealedKeys, setRevealedKeys] = useState<Record<string, boolean>>({})
   const [viewMode, setViewMode] = useState<ViewMode>('card')
+
+  useEffect(() => {
+    if (initialCreate) {
+      setCreating(true)
+      onResetInitialCreate?.()
+    }
+  }, [initialCreate, onResetInitialCreate])
+
+  useEffect(() => {
+    if (initialSearch) {
+      setSearch(initialSearch)
+      setPage(1)
+    }
+  }, [initialSearch])
 
   // Pagination state
   const [page, setPage] = useState(1)
