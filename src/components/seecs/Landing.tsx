@@ -16,6 +16,7 @@ import {
   Mail,
   ArrowRight,
 } from 'lucide-react'
+import { ThemeToggle } from '@/components/theme-toggle'
 
 /* ─── Custom keyframe animations (CSS only, no external files) ─── */
 const customStyles = `
@@ -62,22 +63,22 @@ const customStyles = `
 const ACCENTS = {
   emerald: {
     border: 'border-l-emerald-500',
-    iconBg: 'bg-emerald-100 text-emerald-600',
+    iconBg: 'bg-emerald-100 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400',
     hoverShadow: 'hover:shadow-emerald-500/10',
   },
   amber: {
     border: 'border-l-amber-500',
-    iconBg: 'bg-amber-100 text-amber-600',
+    iconBg: 'bg-amber-100 dark:bg-amber-950 text-amber-600 dark:text-amber-400',
     hoverShadow: 'hover:shadow-amber-500/10',
   },
   sky: {
     border: 'border-l-sky-500',
-    iconBg: 'bg-sky-100 text-sky-600',
+    iconBg: 'bg-sky-100 dark:bg-sky-950 text-sky-600 dark:text-sky-400',
     hoverShadow: 'hover:shadow-sky-500/10',
   },
   violet: {
     border: 'border-l-violet-500',
-    iconBg: 'bg-violet-100 text-violet-600',
+    iconBg: 'bg-violet-100 dark:bg-violet-950 text-violet-600 dark:text-violet-400',
     hoverShadow: 'hover:shadow-violet-500/10',
   },
 } as const
@@ -110,7 +111,7 @@ function FeatureCard({
           {icon}
         </div>
         <CardTitle className="text-base font-semibold">{title}</CardTitle>
-        <CardDescription className="text-sm leading-relaxed text-stone-500">
+        <CardDescription className="text-sm leading-relaxed text-stone-500 dark:text-stone-400">
           {desc}
         </CardDescription>
       </CardHeader>
@@ -137,13 +138,13 @@ function StepCard({
           {/* Numbered gradient circle */}
           <div className="relative h-12 w-12 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 text-white grid place-items-center shadow-lg shadow-emerald-500/20 shrink-0">
             {icon}
-            <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-white text-emerald-700 text-[11px] font-bold grid place-items-center border border-emerald-200 shadow-sm">
+            <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-white dark:bg-stone-800 text-emerald-700 dark:text-emerald-300 text-[11px] font-bold grid place-items-center border border-emerald-200 dark:border-emerald-700 shadow-sm">
               {step}
             </span>
           </div>
         </div>
         <CardTitle className="text-base font-semibold">{title}</CardTitle>
-        <CardDescription className="text-sm leading-relaxed text-stone-500">
+        <CardDescription className="text-sm leading-relaxed text-stone-500 dark:text-stone-400">
           {desc}
         </CardDescription>
       </CardHeader>
@@ -156,8 +157,8 @@ function StepConnector() {
   return (
     <div className="hidden md:flex items-center justify-center shrink-0 px-1">
       <div className="flex items-center">
-        <div className="w-6 border-t-2 border-dashed border-emerald-300" />
-        <div className="h-7 w-7 rounded-full bg-emerald-50 border border-emerald-200 grid place-items-center shadow-sm -ml-0.5">
+        <div className="w-6 border-t-2 border-dashed border-emerald-300 dark:border-emerald-700" />
+        <div className="h-7 w-7 rounded-full bg-emerald-50 dark:bg-emerald-950 border border-emerald-200 dark:border-emerald-800 grid place-items-center shadow-sm -ml-0.5">
           <ArrowRight className="h-3.5 w-3.5 text-emerald-500" />
         </div>
       </div>
@@ -185,27 +186,28 @@ export default function Landing({
     <>
       <style dangerouslySetInnerHTML={{ __html: customStyles }} />
 
-      <div className="min-h-screen flex flex-col bg-gradient-to-b from-stone-50 via-white to-stone-50/80 lp-fade-in">
+      <div className="min-h-screen flex flex-col bg-gradient-to-b from-stone-50 via-white to-stone-50/80 dark:from-stone-950 dark:via-stone-900 dark:to-stone-950 lp-fade-in">
         {/* ── Header ── */}
-        <header className="border-b border-stone-200/60 bg-white/80 backdrop-blur-md sticky top-0 z-10 lp-fade-in">
+        <header className="border-b border-stone-200/60 dark:border-stone-700/60 bg-white/80 dark:bg-stone-900/80 backdrop-blur-md sticky top-0 z-10 lp-fade-in">
           <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-emerald-600 to-teal-600 text-white grid place-items-center font-bold text-lg shadow-md shadow-emerald-500/20">
                 S
               </div>
               <div className="leading-tight">
-                <div className="font-semibold text-sm sm:text-base text-stone-800">
+                <div className="font-semibold text-sm sm:text-base text-stone-800 dark:text-stone-100">
                   SEECS Database
                 </div>
-                <div className="text-xs text-stone-500">NUST Islamabad</div>
+                <div className="text-xs text-stone-500 dark:text-stone-400">NUST Islamabad</div>
               </div>
             </div>
             <div className="flex items-center gap-2">
+              <ThemeToggle className="text-stone-600 dark:text-stone-300" />
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={onEnterCompany}
-                className="text-stone-600 hover:text-emerald-700 hover:bg-emerald-50 transition-colors"
+                className="text-stone-600 hover:text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950 dark:text-stone-300 transition-colors"
               >
                 Company Portal
               </Button>
@@ -251,7 +253,7 @@ export default function Landing({
 
             <div className="relative max-w-6xl mx-auto px-4 sm:px-6 pt-16 pb-12 sm:pt-24 sm:pb-16 text-center">
               {/* Floating badge */}
-              <div className="lp-float inline-flex items-center gap-2 rounded-full border border-emerald-200/60 bg-emerald-50/80 backdrop-blur-sm px-4 py-1.5 text-xs text-emerald-700 font-medium mb-8 lp-fade-up-d1">
+              <div className="lp-float inline-flex items-center gap-2 rounded-full border border-emerald-200/60 dark:border-emerald-800/60 bg-emerald-50/80 dark:bg-emerald-950/80 backdrop-blur-sm px-4 py-1.5 text-xs text-emerald-700 dark:text-emerald-300 font-medium mb-8 lp-fade-up-d1">
                 <span className="relative flex h-2 w-2">
                   <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
                   <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
@@ -260,11 +262,11 @@ export default function Landing({
               </div>
 
               {/* Gradient heading */}
-              <h1 className="lp-fade-up-d2 text-3xl sm:text-5xl lg:text-6xl font-bold tracking-tight max-w-3xl mx-auto leading-[1.1] bg-gradient-to-r from-emerald-700 via-teal-600 to-emerald-800 bg-clip-text text-transparent">
+              <h1 className="lp-fade-up-d2 text-3xl sm:text-5xl lg:text-6xl font-bold tracking-tight max-w-3xl mx-auto leading-[1.1] bg-gradient-to-r from-emerald-700 via-teal-600 to-emerald-800 dark:from-emerald-400 dark:via-teal-300 dark:to-emerald-500 bg-clip-text text-transparent">
                 The central registry for SEECS-affiliated companies
               </h1>
 
-              <p className="lp-fade-up-d3 mt-6 text-stone-500 text-base sm:text-lg max-w-2xl mx-auto leading-relaxed">
+              <p className="lp-fade-up-d3 mt-6 text-stone-500 dark:text-stone-400 text-base sm:text-lg max-w-2xl mx-auto leading-relaxed">
                 Manage companies, founders, sectors and financial performance in
                 one place. Built-in analytics, an AI assistant for the database
                 manager, and a secure per-company self-service portal where each
@@ -292,7 +294,7 @@ export default function Landing({
                   size="lg"
                   variant="outline"
                   onClick={onEnterCompany}
-                  className="w-full sm:w-auto border-emerald-300 text-emerald-700 hover:bg-emerald-50 hover:border-emerald-400 hover:text-emerald-800 transition-all duration-300 lp-pulse-glow"
+                  className="w-full sm:w-auto border-emerald-300 dark:border-emerald-700 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-950 hover:border-emerald-400 dark:hover:border-emerald-600 hover:text-emerald-800 dark:hover:text-emerald-200 transition-all duration-300 lp-pulse-glow"
                 >
                   <KeyRound className="h-4 w-4 mr-2" />
                   Company Portal / Register
@@ -337,10 +339,10 @@ export default function Landing({
 
           {/* ── How It Works ── */}
           <section className="max-w-6xl mx-auto px-4 sm:px-6 pb-20">
-            <h2 className="lp-fade-up text-2xl sm:text-3xl font-bold text-center mb-2 bg-gradient-to-r from-emerald-700 to-teal-600 bg-clip-text text-transparent">
+            <h2 className="lp-fade-up text-2xl sm:text-3xl font-bold text-center mb-2 bg-gradient-to-r from-emerald-700 to-teal-600 dark:from-emerald-400 dark:to-teal-300 bg-clip-text text-transparent">
               How it works
             </h2>
-            <p className="lp-fade-up-d1 text-center text-stone-500 mb-10 text-sm">
+            <p className="lp-fade-up-d1 text-center text-stone-500 dark:text-stone-400 mb-10 text-sm">
               Three simple steps to get started with the SEECS Database
             </p>
 
@@ -383,7 +385,7 @@ export default function Landing({
                 desc="The database manager logs in to maintain sectors, cities, locations, degrees and the master list of companies."
               />
               <div className="flex justify-center py-1">
-                <div className="h-6 border-l-2 border-dashed border-emerald-300" />
+                <div className="h-6 border-l-2 border-dashed border-emerald-300 dark:border-emerald-700" />
               </div>
               <StepCard
                 step="2"
@@ -392,7 +394,7 @@ export default function Landing({
                 desc="A company fills the registration form. The system issues a unique API key for that company only."
               />
               <div className="flex justify-center py-1">
-                <div className="h-6 border-l-2 border-dashed border-emerald-300" />
+                <div className="h-6 border-l-2 border-dashed border-emerald-300 dark:border-emerald-700" />
               </div>
               <StepCard
                 step="3"

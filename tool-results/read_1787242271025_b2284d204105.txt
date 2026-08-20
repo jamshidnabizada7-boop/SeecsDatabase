@@ -1,0 +1,1074 @@
+     1→'use client'
+     2→
+     3→import { useEffect, useState, useMemo, useCallback, useRef } from 'react'
+     4→import { api, formatDate, formatCurrency } from '@/lib/client-utils'
+     5→import { Button } from '@/components/ui/button'
+     6→import { Card, CardContent } from '@/components/ui/card'
+     7→import { Input } from '@/components/ui/input'
+     8→import { Label } from '@/components/ui/label'
+     9→import { Textarea } from '@/components/ui/textarea'
+    10→import { Badge } from '@/components/ui/badge'
+    11→import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+    12→import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+    13→import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+    14→import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+    15→import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
+    16→import { useToast } from '@/hooks/use-toast'
+    17→import { Building2, Loader2, Plus, RefreshCw, Search, KeyRound, Pencil, Trash2, Copy, Eye, EyeOff, Columns3, ChevronDown, ChevronUp, Download, LayoutGrid, List, RotateCw, X } from 'lucide-react'
+    18→import {
+    19→  Pagination,
+    20→  PaginationContent,
+    21→  PaginationItem,
+    22→  PaginationLink,
+    23→  PaginationPrevious,
+    24→  PaginationNext,
+    25→  PaginationEllipsis,
+    26→} from '@/components/ui/pagination'
+    27→
+    28→interface CustomColumn {
+    29→  id: string
+    30→  name: string
+    31→  slug: string
+    32→  columnType: string
+    33→  targetTable: string
+    34→  description: string | null
+    35→  required: boolean
+    36→  sortOrder: number
+    37→}
+    38→
+    39→interface CustomValue {
+    40→  id: string
+    41→  customColumnId: string
+    42→  value: string
+    43→  customColumn: CustomColumn
+    44→}
+    45→
+    46→interface Company {
+    47→  id: string
+    48→  name: string
+    49→  description: string | null
+    50→  email: string | null
+    51→  phone: string | null
+    52→  website: string | null
+    53→  apiKey: string
+    54→  apiKeyActive: boolean
+    55→  sectorId: string
+    56→  cityId: string
+    57→  locationId: string | null
+    58→  registeredAt: string
+    59→  // New Java fields
+    60→  status: string | null
+    61→  statusReason: string | null
+    62→  sinceDate: string | null
+    63→  foundedYear: number | null
+    64→  discontinuedDate: string | null
+    65→  branchesCount: number | null
+    66→  revenue: number | null
+    67→  revenueMin: number | null
+    68→  revenueMax: number | null
+    69→  // Relations
+    70→  sector: { id: string; name: string }
+    71→  city: { id: string; name: string }
+    72→  location: { id: string; address: string; country: string; city: { name: string } } | null
+    73→  founders: { id: string; role: string; founder: { id: string; firstName: string; lastName: string } }[]
+    74→  _count: { annualData: number }
+    75→  customValues: CustomValue[]
+    76→}
+    77→
+    78→interface Lookup {
+    79→  sectors: { id: string; name: string }[]
+    80→  cities: { id: string; name: string }[]
+    81→  locations: { id: string; address: string; city: { name: string } }[]
+    82→  degrees: { id: string; name: string; field: string | null }[]
+    83→  founders: { id: string; firstName: string; lastName: string; gender: string }[]
+    84→}
+    85→
+    86→const STATUS_STYLES: Record<string, string> = {
+    87→  Active: 'bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800',
+    88→  Inactive: 'bg-amber-50 dark:bg-amber-950 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800',
+    89→  Discontinued: 'bg-rose-50 dark:bg-rose-950 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800',
+    90→}
+    91→
+    92→type ViewMode = 'card' | 'table'
+    93→type StatusFilter = 'All' | 'Active' | 'Inactive' | 'Discontinued'
+    94→
+    95→export default function CompaniesPage() {
+    96→  const [items, setItems] = useState<Company[]>([])
+    97→  const [customColumns, setCustomColumns] = useState<CustomColumn[]>([])
+    98→  const [lookup, setLookup] = useState<Lookup | null>(null)
+    99→  const [loading, setLoading] = useState(true)
+   100→  const [search, setSearch] = useState('')
+   101→  const [editing, setEditing] = useState<Company | null>(null)
+   102→  const [creating, setCreating] = useState(false)
+   103→  const [deleting, setDeleting] = useState<Company | null>(null)
+   104→  const [revealedKeys, setRevealedKeys] = useState<Record<string, boolean>>({})
+   105→  const [showCustom, setShowCustom] = useState<Record<string, boolean>>({})
+   106→  const [viewMode, setViewMode] = useState<ViewMode>('card')
+   107→  const [statusFilter, setStatusFilter] = useState<StatusFilter>('All')
+   108→  const [page, setPage] = useState(1)
+   109→  const [pageSize, setPageSize] = useState(20)
+   110→  const [total, setTotal] = useState(0)
+   111→  const [totalPages, setTotalPages] = useState(1)
+   112→  const { toast } = useToast()
+   113→  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+   114→
+   115→  const buildParams = useCallback((
+   116→    opts?: { searchVal?: string; statusVal?: StatusFilter; pageVal?: number; pageSizeVal?: number }
+   117→  ) => {
+   118→    const q = opts?.searchVal ?? search
+   119→    const st = opts?.statusVal ?? statusFilter
+   120→    const p = opts?.pageVal ?? page
+   121→    const ps = opts?.pageSizeVal ?? pageSize
+   122→    const params = new URLSearchParams()
+   123→    if (p) params.set('page', String(p))
+   124→    if (ps) params.set('limit', String(ps))
+   125→    if (q) params.set('q', q)
+   126→    if (st !== 'All') params.set('status', st)
+   127→    return params.toString() ? `?${params.toString()}` : ''
+   128→  }, [search, statusFilter, page, pageSize])
+   129→
+   130→  const load = useCallback(async (overrideParams?: string) => {
+   131→    setLoading(true)
+   132→    try {
+   133→      const qs = overrideParams ?? buildParams()
+   134→      const [companiesRes, lookupRes] = await Promise.all([
+   135→        api<{ items: Company[]; customColumns: CustomColumn[]; total: number; page: number; limit: number; totalPages: number }>(`/api/admin/companies${qs}`),
+   136→        api<Lookup>('/api/lookup'),
+   137→      ])
+   138→      setItems(companiesRes.items)
+   139→      setCustomColumns(companiesRes.customColumns)
+   140→      setLookup(lookupRes)
+   141→      setTotal(companiesRes.total)
+   142→      setTotalPages(companiesRes.totalPages)
+   143→    } catch (e: any) {
+   144→      toast({ title: 'Error', description: e.message, variant: 'destructive' })
+   145→    } finally {
+   146→      setLoading(false)
+   147→    }
+   148→  }, [buildParams, toast])
+   149→
+   150→  // Main data loading: debounced for search, immediate for page/status/pageSize changes
+   151→  useEffect(() => {
+   152→    if (debounceRef.current) clearTimeout(debounceRef.current)
+   153→    const delay = search ? 300 : 0
+   154→    debounceRef.current = setTimeout(() => {
+   155→      load()
+   156→    }, delay)
+   157→    return () => { if (debounceRef.current) clearTimeout(debounceRef.current) }
+   158→  // eslint-disable-next-line react-hooks/exhaustive-deps
+   159→  }, [search, statusFilter, page, pageSize])
+   160→
+   161→  const handlePageSizeChange = (val: string) => {
+   162→    setPageSize(Number(val))
+   163→    setPage(1)
+   164→  }
+   165→
+   166→  const handleStatusFilter = (val: StatusFilter) => {
+   167→    setStatusFilter(val)
+   168→    setPage(1)
+   169→  }
+   170→
+   171→  const handleSearchClear = () => {
+   172→    setSearch('')
+   173→    setPage(1)
+   174→  }
+   175→
+   176→  const copyKey = (k: string) => {
+   177→    navigator.clipboard?.writeText(k)
+   178→    toast({ title: 'Copied', description: 'API key copied to clipboard' })
+   179→  }
+   180→
+   181→  const regenerateKey = async (company: Company) => {
+   182→    try {
+   183→      await api(`/api/admin/companies/${company.id}`, {
+   184→        method: 'PUT',
+   185→        body: { ...company, regenerateKey: true },
+   186→      })
+   187→      toast({ title: 'Regenerated', description: 'A new API key has been generated' })
+   188→      load()
+   189→    } catch (e: any) {
+   190→      toast({ title: 'Error', description: e.message, variant: 'destructive' })
+   191→    }
+   192→  }
+   193→
+   194→  const exportCSV = async () => {
+   195→    let exportItems: Company[] = items
+   196→    try {
+   197→      const exportParams = new URLSearchParams()
+   198→      if (search) exportParams.set('q', search)
+   199→      if (statusFilter !== 'All') exportParams.set('status', statusFilter)
+   200→      const qs = exportParams.toString() ? `?${exportParams.toString()}` : ''
+   201→      const res = await api<{ items: Company[] }>(`/api/admin/companies${qs}`)
+   202→      exportItems = res.items
+   203→    } catch {
+   204→      // fall back to current page items
+   205→    }
+   206→    const headers = ['Name', 'Email', 'Phone', 'Website', 'Status', 'Since Date', 'Founded Year', 'Branches', 'Revenue', 'Sector', 'City', 'API Key']
+   207→    const rows = exportItems.map((c) => [
+   208→      c.name,
+   209→      c.email || '',
+   210→      c.phone || '',
+   211→      c.website || '',
+   212→      c.status || '',
+   213→      c.sinceDate || '',
+   214→      c.foundedYear || '',
+   215→      c.branchesCount || '',
+   216→      c.revenue || '',
+   217→      c.sector.name,
+   218→      c.city.name,
+   219→      c.apiKey,
+   220→    ])
+   221→    const csvContent = [headers, ...rows]
+   222→      .map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+   223→      .join('\n')
+   224→    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+   225→    const url = URL.createObjectURL(blob)
+   226→    const a = document.createElement('a')
+   227→    a.href = url
+   228→    a.download = `companies-export-${new Date().toISOString().slice(0, 10)}.csv`
+   229→    a.click()
+   230→    URL.revokeObjectURL(url)
+   231→    toast({ title: 'Exported', description: `${exportItems.length} companies exported as CSV` })
+   232→  }
+   233→
+   234→  const getCustomValue = (company: Company, columnId: string) => {
+   235→    return company.customValues?.find((cv) => cv.customColumnId === columnId)?.value || ''
+   236→  }
+   237→
+   238→  const statusFilterOptions: { label: string; value: StatusFilter }[] = [
+   239→    { label: 'All', value: 'All' },
+   240→    { label: 'Active', value: 'Active' },
+   241→    { label: 'Inactive', value: 'Inactive' },
+   242→    { label: 'Discontinued', value: 'Discontinued' },
+   243→  ]
+   244→
+   245→  const showingFrom = total === 0 ? 0 : (page - 1) * pageSize + 1
+   246→  const showingTo = Math.min(page * pageSize, total)
+   247→
+   248→  const paginationRange = useMemo(() => {
+   249→    const range: number[] = []
+   250→    const delta = 2
+   251→    const left = Math.max(1, page - delta)
+   252→    const right = Math.min(totalPages, page + delta)
+   253→    for (let i = left; i <= right; i++) range.push(i)
+   254→    return range
+   255→  }, [page, totalPages])
+   256→
+   257→  return (
+   258→    <div className="p-4 sm:p-6 space-y-4 max-w-7xl mx-auto">
+   259→      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+   260→        <div>
+   261→          <h1 className="text-2xl font-semibold">Companies</h1>
+   262→          <p className="text-sm text-muted-foreground">{total} companies total · {statusFilter !== 'All' ? statusFilter : ''} {search ? `matching "${search}"` : ''}</p>
+   263→        </div>
+   264→        <div className="flex gap-2 flex-wrap">
+   265→          <Button variant="outline" size="sm" onClick={load} disabled={loading}>
+   266→            {loading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-2" />}
+   267→            Refresh
+   268→          </Button>
+   269→          <Button variant="outline" size="sm" onClick={exportCSV}>
+   270→            <Download className="h-4 w-4 mr-2" /> Export CSV
+   271→          </Button>
+   272→          <Button size="sm" onClick={() => setCreating(true)}>
+   273→            <Plus className="h-4 w-4 mr-2" /> Add company
+   274→          </Button>
+   275→        </div>
+   276→      </div>
+   277→
+   278→      <div className="flex flex-col sm:flex-row gap-3">
+   279→        <div className="relative max-w-sm flex-1">
+   280→          <Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+   281→          <Input
+   282→            placeholder="Search by name, description, website…"
+   283→            value={search}
+   284→            onChange={(e) => setSearch(e.target.value)}
+   285→            className="pl-9 pr-8"
+   286→          />
+   287→          {search && (
+   288→            <button
+   289→              onClick={handleSearchClear}
+   290→              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+   291→            >
+   292→              <X className="h-3.5 w-3.5" />
+   293→            </button>
+   294→          )}
+   295→        </div>
+   296→        <div className="flex items-center gap-1.5 flex-wrap">
+   297→          {/* Status filter badges */}
+   298→          {statusFilterOptions.map((sf) => (
+   299→            <button
+   300→              key={sf.value}
+   301→              onClick={() => handleStatusFilter(sf.value)}
+   302→              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
+   303→                statusFilter === sf.value
+   304→                  ? 'bg-emerald-600 text-white border-emerald-600'
+   305→                  : 'bg-background text-stone-600 border-stone-200 hover:bg-stone-50 hover:text-stone-900'
+   306→              }`}
+   307→            >
+   308→              {sf.label}
+   309→            </button>
+   310→          ))}
+   311→          <div className="w-px h-6 bg-border mx-1" />
+   312→          {/* View mode toggle */}
+   313→          <Button
+   314→            variant={viewMode === 'card' ? 'default' : 'ghost'}
+   315→            size="icon"
+   316→            className="h-8 w-8"
+   317→            onClick={() => setViewMode('card')}
+   318→            title="Card view"
+   319→          >
+   320→            <LayoutGrid className="h-4 w-4" />
+   321→          </Button>
+   322→          <Button
+   323→            variant={viewMode === 'table' ? 'default' : 'ghost'}
+   324→            size="icon"
+   325→            className="h-8 w-8"
+   326→            onClick={() => setViewMode('table')}
+   327→            title="Table view"
+   328→          >
+   329→            <List className="h-4 w-4" />
+   330→          </Button>
+   331→        </div>
+   332→      </div>
+   333→
+   334→      {loading && items.length === 0 ? (
+   335→        <div className="py-12 text-center text-muted-foreground text-sm"><Loader2 className="h-5 w-5 animate-spin inline mr-2" />Loading…</div>
+   336→      ) : viewMode === 'card' ? (
+   337→        <div className="grid gap-3">
+   338→          {items.map((c) => {
+   339→            const revealed = revealedKeys[c.id]
+   340→            const showCust = showCustom[c.id]
+   341→            return (
+   342→              <Card key={c.id} className="overflow-hidden">
+   343→                <CardContent className="p-4 sm:p-5">
+   344→                  <div className="flex flex-col lg:flex-row gap-4">
+   345→                    {/* Left: identity */}
+   346→                    <div className="flex-1 min-w-0">
+   347→                      <div className="flex items-start justify-between gap-3">
+   348→                        <div className="min-w-0">
+   349→                          <div className="flex items-center gap-2 flex-wrap">
+   350→                            <h3 className="font-semibold truncate">{c.name}</h3>
+   351→                            {c.status ? (
+   352→                              <Badge variant="outline" className={`text-xs ${STATUS_STYLES[c.status] || ''}`}>{c.status}</Badge>
+   353→                            ) : c.apiKeyActive ? (
+   354→                              <Badge variant="secondary" className="text-emerald-600 bg-emerald-50 border-emerald-200">Active</Badge>
+   355→                            ) : (
+   356→                              <Badge variant="destructive" className="bg-rose-50 text-rose-700 border-rose-200">Revoked</Badge>
+   357→                            )}
+   358→                          </div>
+   359→                          <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{c.description || 'No description.'}</p>
+   360→                        </div>
+   361→                      </div>
+   362→
+   363→                      <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
+   364→                        <Field label="Sector" value={c.sector.name} />
+   365→                        <Field label="City" value={c.city.name} />
+   366→                        <Field label="Founders" value={String(c.founders.length)} />
+   367→                        <Field label="Annual records" value={String(c._count.annualData)} />
+   368→                      </div>
+   369→
+   370→                      {/* New fields row */}
+   371→                      {(c.foundedYear || c.sinceDate || c.branchesCount || c.revenue != null || c.revenueMin != null) && (
+   372→                        <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
+   373→                          {c.foundedYear && <Field label="Founded" value={String(c.foundedYear)} />}
+   374→                          {c.sinceDate && <Field label="Since" value={c.sinceDate} />}
+   375→                          {c.branchesCount != null && <Field label="Branches" value={String(c.branchesCount)} />}
+   376→                          {c.revenue != null ? (
+   377→                            <Field label="Revenue" value={formatCurrency(c.revenue)} />
+   378→                          ) : c.revenueMin != null || c.revenueMax != null ? (
+   379→                            <Field label="Revenue range" value={`${formatCurrency(c.revenueMin || 0)} – ${formatCurrency(c.revenueMax || 0)}`} />
+   380→                          ) : null}
+   381→                        </div>
+   382→                      )}
+   383→
+   384→                      {c.statusReason && (
+   385→                        <p className="mt-2 text-xs text-muted-foreground">Status reason: {c.statusReason}</p>
+   386→                      )}
+   387→                      {c.discontinuedDate && (
+   388→                        <p className="mt-1 text-xs text-rose-600">Discontinued: {c.discontinuedDate}</p>
+   389→                      )}
+   390→
+   391→                      {c.founders.length > 0 && (
+   392→                        <div className="mt-3 flex flex-wrap gap-1.5">
+   393→                          {c.founders.map((cf) => (
+   394→                            <Badge key={cf.id} variant="outline" className="text-xs">
+   395→                              {cf.founder.firstName} {cf.founder.lastName} · <span className="text-muted-foreground">{cf.role}</span>
+   396→                            </Badge>
+   397→                          ))}
+   398→                        </div>
+   399→                      )}
+   400→
+   401→                      {/* Custom columns inline */}
+   402→                      {customColumns.length > 0 && (
+   403→                        <div className="mt-3">
+   404→                          <button
+   405→                            className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
+   406→                            onClick={() => setShowCustom((s) => ({ ...s, [c.id]: !s[c.id] }))}
+   407→                          >
+   408→                            <Columns3 className="h-3.5 w-3.5" />
+   409→                            Custom fields ({customColumns.length})
+   410→                            {showCust ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+   411→                          </button>
+   412→                          {showCust && (
+   413→                            <div className="mt-2 grid grid-cols-2 sm:grid-cols-3 gap-2">
+   414→                              {customColumns.map((col) => (
+   415→                                <div key={col.id} className="text-sm">
+   416→                                  <span className="text-xs text-muted-foreground">{col.name}</span>
+   417→                                  <div className="font-medium truncate">{getCustomValue(c, col.id) || <span className="text-muted-foreground italic">—</span>}</div>
+   418→                                </div>
+   419→                              ))}
+   420→                            </div>
+   421→                          )}
+   422→                        </div>
+   423→                      )}
+   424→                    </div>
+   425→
+   426→                    {/* Right: API key + actions */}
+   427→                    <div className="lg:w-80 lg:border-l lg:pl-5 space-y-2">
+   428→                      <div>
+   429→                        <Label className="text-xs text-muted-foreground">API Key</Label>
+   430→                        <div className="flex items-center gap-1 mt-1">
+   431→                          <code className="text-xs font-mono bg-muted px-2 py-1 rounded flex-1 truncate">
+   432→                            {revealed ? c.apiKey : `${c.apiKey.slice(0, 14)}••••••••`}
+   433→                          </code>
+   434→                          <Tooltip>
+   435→                            <TooltipTrigger asChild>
+   436→                              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setRevealedKeys((s) => ({ ...s, [c.id]: !s[c.id] }))}>
+   437→                                {revealed ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+   438→                              </Button>
+   439→                            </TooltipTrigger>
+   440→                            <TooltipContent>{revealed ? 'Hide key' : 'Reveal key'}</TooltipContent>
+   441→                          </Tooltip>
+   442→                          <Tooltip>
+   443→                            <TooltipTrigger asChild>
+   444→                              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => copyKey(c.apiKey)}>
+   445→                                <Copy className="h-3.5 w-3.5" />
+   446→                              </Button>
+   447→                            </TooltipTrigger>
+   448→                            <TooltipContent>Copy to clipboard</TooltipContent>
+   449→                          </Tooltip>
+   450→                          <Tooltip>
+   451→                            <TooltipTrigger asChild>
+   452→                              <Button variant="ghost" size="icon" className="h-7 w-7 text-amber-600 hover:text-amber-700 hover:bg-amber-50" onClick={() => regenerateKey(c)}>
+   453→                                <RotateCw className="h-3.5 w-3.5" />
+   454→                              </Button>
+   455→                            </TooltipTrigger>
+   456→                            <TooltipContent>Regenerate key</TooltipContent>
+   457→                          </Tooltip>
+   458→                        </div>
+   459→                      </div>
+   460→                      <div className="flex gap-2">
+   461→                        <Button variant="outline" size="sm" className="flex-1" onClick={() => setEditing(c)}>
+   462→                          <Pencil className="h-3.5 w-3.5 mr-1" /> Edit
+   463→                        </Button>
+   464→                        <Button variant="outline" size="sm" className="text-destructive hover:bg-destructive/5" onClick={() => setDeleting(c)}>
+   465→                          <Trash2 className="h-3.5 w-3.5" />
+   466→                        </Button>
+   467→                      </div>
+   468→                    </div>
+   469→                  </div>
+   470→                </CardContent>
+   471→              </Card>
+   472→            )
+   473→          })}
+   474→          {items.length === 0 && (
+   475→            <div className="py-16 text-center text-muted-foreground">
+   476→              <Building2 className="h-8 w-8 mx-auto mb-3 opacity-50" />
+   477→              {search
+   478→                ? 'No companies found matching your search.'
+   479→                : statusFilter !== 'All'
+   480→                  ? `No companies with status "${statusFilter}".`
+   481→                  : 'No companies yet. Add one or let companies self-register.'}
+   482→            </div>
+   483→          )}
+   484→        </div>
+   485→      ) : (
+   486→        /* Table View */
+   487→        <Card>
+   488→          <CardContent className="p-0">
+   489→            <Table>
+   490→              <TableHeader>
+   491→                <TableRow>
+   492→                  <TableHead className="pl-4">Name</TableHead>
+   493→                  <TableHead>Sector</TableHead>
+   494→                  <TableHead className="hidden md:table-cell">City</TableHead>
+   495→                  <TableHead>Status</TableHead>
+   496→                  <TableHead className="hidden lg:table-cell">Founded</TableHead>
+   497→                  <TableHead className="hidden lg:table-cell">Revenue</TableHead>
+   498→                  <TableHead>API Key</TableHead>
+   499→                  <TableHead className="text-right pr-4">Actions</TableHead>
+   500→                </TableRow>
+   501→              </TableHeader>
+   502→              <TableBody>
+   503→                {items.map((c) => {
+   504→                  const revealed = revealedKeys[c.id]
+   505→                  return (
+   506→                    <TableRow key={c.id}>
+   507→                      <TableCell className="pl-4 font-medium max-w-[200px] truncate">
+   508→                        <div className="truncate">{c.name}</div>
+   509→                        {c.email && <div className="text-xs text-muted-foreground truncate">{c.email}</div>}
+   510→                      </TableCell>
+   511→                      <TableCell className="text-muted-foreground">{c.sector.name}</TableCell>
+   512→                      <TableCell className="hidden md:table-cell text-muted-foreground">{c.city.name}</TableCell>
+   513→                      <TableCell>
+   514→                        {c.status ? (
+   515→                          <Badge variant="outline" className={`text-xs ${STATUS_STYLES[c.status] || ''}`}>{c.status}</Badge>
+   516→                        ) : c.apiKeyActive ? (
+   517→                          <Badge variant="secondary" className="text-xs text-emerald-600 bg-emerald-50 border-emerald-200">Active</Badge>
+   518→                        ) : (
+   519→                          <Badge variant="destructive" className="text-xs bg-rose-50 text-rose-700 border-rose-200">Revoked</Badge>
+   520→                        )}
+   521→                      </TableCell>
+   522→                      <TableCell className="hidden lg:table-cell text-muted-foreground">
+   523→                        {c.foundedYear || '—'}
+   524→                      </TableCell>
+   525→                      <TableCell className="hidden lg:table-cell text-muted-foreground">
+   526→                        {c.revenue != null ? formatCurrency(c.revenue) : '—'}
+   527→                      </TableCell>
+   528→                      <TableCell>
+   529→                        <div className="flex items-center gap-0.5">
+   530→                          <code className="text-xs font-mono bg-muted px-1.5 py-0.5 rounded max-w-[120px] truncate">
+   531→                            {revealed ? c.apiKey : `${c.apiKey.slice(0, 10)}•••`}
+   532→                          </code>
+   533→                          <Tooltip>
+   534→                            <TooltipTrigger asChild>
+   535→                              <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setRevealedKeys((s) => ({ ...s, [c.id]: !s[c.id] }))}>
+   536→                                {revealed ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
+   537→                              </Button>
+   538→                            </TooltipTrigger>
+   539→                            <TooltipContent>{revealed ? 'Hide' : 'Reveal'}</TooltipContent>
+   540→                          </Tooltip>
+   541→                          <Tooltip>
+   542→                            <TooltipTrigger asChild>
+   543→                              <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => copyKey(c.apiKey)}>
+   544→                                <Copy className="h-3 w-3" />
+   545→                              </Button>
+   546→                            </TooltipTrigger>
+   547→                            <TooltipContent>Copy</TooltipContent>
+   548→                          </Tooltip>
+   549→                          <Tooltip>
+   550→                            <TooltipTrigger asChild>
+   551→                              <Button variant="ghost" size="icon" className="h-6 w-6 text-amber-600 hover:text-amber-700" onClick={() => regenerateKey(c)}>
+   552→                                <RotateCw className="h-3 w-3" />
+   553→                              </Button>
+   554→                            </TooltipTrigger>
+   555→                            <TooltipContent>Regenerate</TooltipContent>
+   556→                          </Tooltip>
+   557→                        </div>
+   558→                      </TableCell>
+   559→                      <TableCell className="text-right pr-4">
+   560→                        <div className="flex items-center justify-end gap-1">
+   561→                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setEditing(c)}>
+   562→                            <Pencil className="h-3.5 w-3.5" />
+   563→                          </Button>
+   564→                          <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => setDeleting(c)}>
+   565→                            <Trash2 className="h-3.5 w-3.5" />
+   566→                          </Button>
+   567→                        </div>
+   568→                      </TableCell>
+   569→                    </TableRow>
+   570→                  )
+   571→                })}
+   572→              </TableBody>
+   573→            </Table>
+   574→            {items.length === 0 && (
+   575→              <div className="py-16 text-center text-muted-foreground">
+   576→                <Building2 className="h-8 w-8 mx-auto mb-3 opacity-50" />
+   577→                {search
+   578→                  ? 'No companies found matching your search.'
+   579→                  : statusFilter !== 'All'
+   580→                    ? `No companies with status "${statusFilter}".`
+   581→                    : 'No companies yet.'}
+   582→              </div>
+   583→            )}
+   584→          </CardContent>
+   585→        </Card>
+   586→      )}
+   587→
+   588→      {/* Pagination & info */}
+   589→      {total > 0 && (
+   590→        <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+   591→          <div className="flex items-center gap-3">
+   592→            <span className="text-sm text-stone-500">
+   593→              Showing {showingFrom} to {showingTo} of {total} companies
+   594→            </span>
+   595→            <div className="flex items-center gap-1.5">
+   596→              <span className="text-xs text-stone-500">Per page:</span>
+   597→              <Select value={String(pageSize)} onValueChange={handlePageSizeChange}>
+   598→                <SelectTrigger className="h-8 w-[70px] text-xs">
+   599→                  <SelectValue />
+   600→                </SelectTrigger>
+   601→                <SelectContent>
+   602→                  <SelectItem value="10">10</SelectItem>
+   603→                  <SelectItem value="20">20</SelectItem>
+   604→                  <SelectItem value="50">50</SelectItem>
+   605→                </SelectContent>
+   606→              </Select>
+   607→            </div>
+   608→          </div>
+   609→          {totalPages > 1 && (
+   610→            <Pagination>
+   611→              <PaginationContent>
+   612→                <PaginationItem>
+   613→                  <PaginationPrevious
+   614→                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+   615→                    className={page <= 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+   616→                  />
+   617→                </PaginationItem>
+   618→                {paginationRange[0] > 1 && (
+   619→                  <>
+   620→                    <PaginationItem>
+   621→                      <PaginationLink onClick={() => setPage(1)} className="cursor-pointer">1</PaginationLink>
+   622→                    </PaginationItem>
+   623→                    {paginationRange[0] > 2 && <PaginationEllipsis />}
+   624→                  </>
+   625→                )}
+   626→                {paginationRange.map((p) => (
+   627→                  <PaginationItem key={p}>
+   628→                    <PaginationLink
+   629→                      isActive={p === page}
+   630→                      onClick={() => setPage(p)}
+   631→                      className="cursor-pointer"
+   632→                    >
+   633→                      {p}
+   634→                    </PaginationLink>
+   635→                  </PaginationItem>
+   636→                ))}
+   637→                {paginationRange[paginationRange.length - 1] < totalPages && (
+   638→                  <>
+   639→                    {paginationRange[paginationRange.length - 1] < totalPages - 1 && <PaginationEllipsis />}
+   640→                    <PaginationItem>
+   641→                      <PaginationLink
+   642→                        onClick={() => setPage(totalPages)}
+   643→                        className="cursor-pointer"
+   644→                      >
+   645→                        {totalPages}
+   646→                      </PaginationLink>
+   647→                    </PaginationItem>
+   648→                  </>
+   649→                )}
+   650→                <PaginationItem>
+   651→                  <PaginationNext
+   652→                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+   653→                    className={page >= totalPages ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+   654→                  />
+   655→                </PaginationItem>
+   656→              </PaginationContent>
+   657→            </Pagination>
+   658→          )}
+   659→        </div>
+   660→      )}
+   661→
+   662→      {/* Create dialog */}
+   663→      <CompanyFormDialog
+   664→        open={creating}
+   665→        onOpenChange={setCreating}
+   666→        lookup={lookup}
+   667→        customColumns={customColumns}
+   668→        onSaved={() => { setCreating(false); load() }}
+   669→      />
+   670→      {/* Edit dialog */}
+   671→      <CompanyFormDialog
+   672→        open={!!editing}
+   673→        onOpenChange={(o) => !o && setEditing(null)}
+   674→        company={editing}
+   675→        lookup={lookup}
+   676→        customColumns={customColumns}
+   677→        onSaved={() => { setEditing(null); load() }}
+   678→      />
+   679→      {/* Delete confirm */}
+   680→      <AlertDialog open={!!deleting} onOpenChange={(o) => !o && setDeleting(null)}>
+   681→        <AlertDialogContent>
+   682→          <AlertDialogHeader>
+   683→            <AlertDialogTitle>Delete company "{deleting?.name}"?</AlertDialogTitle>
+   684→            <AlertDialogDescription>
+   685→              This permanently removes the company, its founder attachments and all annual data. This cannot be undone.
+   686→            </AlertDialogDescription>
+   687→          </AlertDialogHeader>
+   688→          <AlertDialogFooter>
+   689→            <AlertDialogCancel>Cancel</AlertDialogCancel>
+   690→            <AlertDialogAction
+   691→              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+   692→              onClick={async () => {
+   693→                try {
+   694→                  await api(`/api/admin/companies/${deleting!.id}`, { method: 'DELETE' })
+   695→                  toast({ title: 'Deleted', description: `${deleting!.name} removed` })
+   696→                  setDeleting(null)
+   697→                  load()
+   698→                } catch (e: any) {
+   699→                  toast({ title: 'Error', description: e.message, variant: 'destructive' })
+   700→                }
+   701→              }}
+   702→            >
+   703→              Delete
+   704→            </AlertDialogAction>
+   705→          </AlertDialogFooter>
+   706→        </AlertDialogContent>
+   707→      </AlertDialog>
+   708→    </div>
+   709→  )
+   710→}
+   711→
+   712→function Field({ label, value }: { label: string; value: React.ReactNode }) {
+   713→  return (
+   714→    <div>
+   715→      <div className="text-xs text-muted-foreground">{label}</div>
+   716→      <div className="font-medium truncate">{value}</div>
+   717→    </div>
+   718→  )
+   719→}
+   720→
+   721→function CompanyFormDialog({
+   722→  open,
+   723→  onOpenChange,
+   724→  company,
+   725→  lookup,
+   726→  customColumns,
+   727→  onSaved,
+   728→}: {
+   729→  open: boolean
+   730→  onOpenChange: (o: boolean) => void
+   731→  company?: Company | null
+   732→  lookup: Lookup | null
+   733→  customColumns: CustomColumn[]
+   734→  onSaved: () => void
+   735→}) {
+   736→  const [name, setName] = useState('')
+   737→  const [description, setDescription] = useState('')
+   738→  const [email, setEmail] = useState('')
+   739→  const [phone, setPhone] = useState('')
+   740→  const [website, setWebsite] = useState('')
+   741→  const [sectorId, setSectorId] = useState('')
+   742→  const [cityId, setCityId] = useState('')
+   743→  const [locationId, setLocationId] = useState('')
+   744→  const [founderIds, setFounderIds] = useState<string[]>([])
+   745→  const [apiKeyActive, setApiKeyActive] = useState(true)
+   746→  const [regenerateKey, setRegenerateKey] = useState(false)
+   747→  // New fields
+   748→  const [status, setStatus] = useState('')
+   749→  const [statusReason, setStatusReason] = useState('')
+   750→  const [sinceDate, setSinceDate] = useState('')
+   751→  const [foundedYear, setFoundedYear] = useState('')
+   752→  const [discontinuedDate, setDiscontinuedDate] = useState('')
+   753→  const [branchesCount, setBranchesCount] = useState('')
+   754→  const [revenue, setRevenue] = useState('')
+   755→  const [revenueMin, setRevenueMin] = useState('')
+   756→  const [revenueMax, setRevenueMax] = useState('')
+   757→  // Custom column values
+   758→  const [customValues, setCustomValues] = useState<Record<string, string>>({})
+   759→  const [saving, setSaving] = useState(false)
+   760→  const { toast } = useToast()
+   761→
+   762→  useEffect(() => {
+   763→    if (open) {
+   764→      setName(company?.name || '')
+   765→      setDescription(company?.description || '')
+   766→      setEmail(company?.email || '')
+   767→      setPhone(company?.phone || '')
+   768→      setWebsite(company?.website || '')
+   769→      setSectorId(company?.sectorId || '')
+   770→      setCityId(company?.cityId || '')
+   771→      setLocationId(company?.locationId || '')
+   772→      setFounderIds(company?.founders.map((f) => f.founder.id) || [])
+   773→      setApiKeyActive(company?.apiKeyActive ?? true)
+   774→      setRegenerateKey(false)
+   775→      // New fields
+   776→      setStatus(company?.status || '')
+   777→      setStatusReason(company?.statusReason || '')
+   778→      setSinceDate(company?.sinceDate || '')
+   779→      setFoundedYear(company?.foundedYear ? String(company.foundedYear) : '')
+   780→      setDiscontinuedDate(company?.discontinuedDate || '')
+   781→      setBranchesCount(company?.branchesCount != null ? String(company.branchesCount) : '')
+   782→      setRevenue(company?.revenue != null ? String(company.revenue) : '')
+   783→      setRevenueMin(company?.revenueMin != null ? String(company.revenueMin) : '')
+   784→      setRevenueMax(company?.revenueMax != null ? String(company.revenueMax) : '')
+   785→      // Custom values
+   786→      const cvMap: Record<string, string> = {}
+   787→      company?.customValues?.forEach((cv) => { cvMap[cv.customColumnId] = cv.value })
+   788→      setCustomValues(cvMap)
+   789→    }
+   790→  }, [open, company])
+   791→
+   792→  const submit = async (e: React.FormEvent) => {
+   793→    e.preventDefault()
+   794→    if (!name || !sectorId || !cityId) {
+   795→      toast({ title: 'Validation', description: 'Name, sector and city are required', variant: 'destructive' })
+   796→      return
+   797→    }
+   798→    // Validate required custom columns
+   799→    for (const col of customColumns) {
+   800→      if (col.required && !customValues[col.id]?.trim()) {
+   801→        toast({ title: 'Validation', description: `"${col.name}" is required`, variant: 'destructive' })
+   802→        return
+   803→      }
+   804→    }
+   805→    setSaving(true)
+   806→    try {
+   807→      const body: Record<string, unknown> = {
+   808→        name, description, email, phone, website,
+   809→        sectorId, cityId, locationId: locationId || null,
+   810→        founderIds, apiKeyActive, regenerateKey,
+   811→        // New fields
+   812→        status: status || null,
+   813→        statusReason: statusReason || null,
+   814→        sinceDate: sinceDate || null,
+   815→        foundedYear: foundedYear ? Number(foundedYear) : null,
+   816→        discontinuedDate: discontinuedDate || null,
+   817→        branchesCount: branchesCount ? Number(branchesCount) : null,
+   818→        revenue: revenue ? Number(revenue) : null,
+   819→        revenueMin: revenueMin ? Number(revenueMin) : null,
+   820→        revenueMax: revenueMax ? Number(revenueMax) : null,
+   821→      }
+   822→      // Add custom values as a separate key
+   823→      const cvPayload = customColumns.map((col) => ({
+   824→        customColumnId: col.id,
+   825→        value: customValues[col.id] || '',
+   826→      }))
+   827→      if (cvPayload.length > 0) {
+   828→        body.customValues = cvPayload
+   829→      }
+   830→
+   831→      if (company) {
+   832→        await api(`/api/admin/companies/${company.id}`, { method: 'PUT', body })
+   833→        toast({ title: 'Saved', description: 'Company updated' })
+   834→      } else {
+   835→        await api('/api/admin/companies', { method: 'POST', body })
+   836→        toast({ title: 'Created', description: 'Company added' })
+   837→      }
+   838→      onSaved()
+   839→    } catch (e: any) {
+   840→      toast({ title: 'Error', description: e.message, variant: 'destructive' })
+   841→    } finally {
+   842→      setSaving(false)
+   843→    }
+   844→  }
+   845→
+   846→  return (
+   847→    <Dialog open={open} onOpenChange={onOpenChange}>
+   848→      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+   849→        <DialogHeader>
+   850→          <DialogTitle>{company ? 'Edit company' : 'New company'}</DialogTitle>
+   851→          <DialogDescription>
+   852→            {company ? 'Update the company profile and manage its API key.' : 'Add a new company to the registry. A unique API key is generated automatically.'}
+   853→          </DialogDescription>
+   854→        </DialogHeader>
+   855→        <form onSubmit={submit} className="space-y-4">
+   856→          {/* Basic info */}
+   857→          <div className="grid sm:grid-cols-2 gap-3">
+   858→            <div className="space-y-1.5 sm:col-span-2">
+   859→              <Label>Company name *</Label>
+   860→              <Input value={name} onChange={(e) => setName(e.target.value)} required />
+   861→            </div>
+   862→            <div className="space-y-1.5 sm:col-span-2">
+   863→              <Label>Description</Label>
+   864→              <Textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={2} />
+   865→            </div>
+   866→            <div className="space-y-1.5">
+   867→              <Label>Email</Label>
+   868→              <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+   869→            </div>
+   870→            <div className="space-y-1.5">
+   871→              <Label>Phone</Label>
+   872→              <Input value={phone} onChange={(e) => setPhone(e.target.value)} />
+   873→            </div>
+   874→            <div className="space-y-1.5 sm:col-span-2">
+   875→              <Label>Website</Label>
+   876→              <Input value={website} onChange={(e) => setWebsite(e.target.value)} placeholder="https://…" />
+   877→            </div>
+   878→          </div>
+   879→
+   880→          {/* Status & Lifecycle */}
+   881→          <div className="border-t pt-4">
+   882→            <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">Status & Lifecycle</div>
+   883→            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+   884→              <div className="space-y-1.5">
+   885→                <Label>Status</Label>
+   886→                <Select value={status} onValueChange={setStatus}>
+   887→                  <SelectTrigger><SelectValue placeholder="Not set" /></SelectTrigger>
+   888→                  <SelectContent>
+   889→                    <SelectItem value="">Not set</SelectItem>
+   890→                    <SelectItem value="Active">Active</SelectItem>
+   891→                    <SelectItem value="Inactive">Inactive</SelectItem>
+   892→                    <SelectItem value="Discontinued">Discontinued</SelectItem>
+   893→                  </SelectContent>
+   894→                </Select>
+   895→              </div>
+   896→              <div className="space-y-1.5">
+   897→                <Label>Status reason</Label>
+   898→                <Input value={statusReason} onChange={(e) => setStatusReason(e.target.value)} placeholder="Optional reason" />
+   899→              </div>
+   900→              <div className="space-y-1.5">
+   901→                <Label>Founded year</Label>
+   902→                <Input type="number" value={foundedYear} onChange={(e) => setFoundedYear(e.target.value)} placeholder="e.g. 2018" min="1950" max="2100" />
+   903→              </div>
+   904→              <div className="space-y-1.5">
+   905→                <Label>Since date</Label>
+   906→                <Input type="date" value={sinceDate} onChange={(e) => setSinceDate(e.target.value)} />
+   907→              </div>
+   908→              <div className="space-y-1.5">
+   909→                <Label>Discontinued date</Label>
+   910→                <Input type="date" value={discontinuedDate} onChange={(e) => setDiscontinuedDate(e.target.value)} />
+   911→              </div>
+   912→              <div className="space-y-1.5">
+   913→                <Label>Branches count</Label>
+   914→                <Input type="number" value={branchesCount} onChange={(e) => setBranchesCount(e.target.value)} placeholder="0" min="0" />
+   915→              </div>
+   916→            </div>
+   917→          </div>
+   918→
+   919→          {/* Revenue */}
+   920→          <div className="border-t pt-4">
+   921→            <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">Revenue (PKR)</div>
+   922→            <div className="grid sm:grid-cols-3 gap-3">
+   923→              <div className="space-y-1.5">
+   924→                <Label>Exact revenue</Label>
+   925→                <Input type="number" value={revenue} onChange={(e) => setRevenue(e.target.value)} placeholder="Leave blank if using range" />
+   926→              </div>
+   927→              <div className="space-y-1.5">
+   928→                <Label>Revenue min</Label>
+   929→                <Input type="number" value={revenueMin} onChange={(e) => setRevenueMin(e.target.value)} placeholder="Min" />
+   930→              </div>
+   931→              <div className="space-y-1.5">
+   932→                <Label>Revenue max</Label>
+   933→                <Input type="number" value={revenueMax} onChange={(e) => setRevenueMax(e.target.value)} placeholder="Max" />
+   934→              </div>
+   935→            </div>
+   936→          </div>
+   937→
+   938→          {/* Classification */}
+   939→          <div className="border-t pt-4">
+   940→            <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">Classification</div>
+   941→            <div className="grid sm:grid-cols-2 gap-3">
+   942→              <div className="space-y-1.5">
+   943→                <Label>Sector *</Label>
+   944→                <Select value={sectorId} onValueChange={setSectorId}>
+   945→                  <SelectTrigger><SelectValue placeholder="Select sector" /></SelectTrigger>
+   946→                  <SelectContent>
+   947→                    {lookup?.sectors.map((s) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
+   948→                  </SelectContent>
+   949→                </Select>
+   950→              </div>
+   951→              <div className="space-y-1.5">
+   952→                <Label>City *</Label>
+   953→                <Select value={cityId} onValueChange={setCityId}>
+   954→                  <SelectTrigger><SelectValue placeholder="Select city" /></SelectTrigger>
+   955→                  <SelectContent>
+   956→                    {lookup?.cities.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+   957→                  </SelectContent>
+   958→                </Select>
+   959→              </div>
+   960→              <div className="space-y-1.5 sm:col-span-2">
+   961→                <Label>Location</Label>
+   962→                <Select value={locationId} onValueChange={setLocationId}>
+   963→                  <SelectTrigger><SelectValue placeholder="Optional" /></SelectTrigger>
+   964→                  <SelectContent>
+   965→                    {lookup?.locations.map((l) => <SelectItem key={l.id} value={l.id}>{l.address} · {l.city.name}</SelectItem>)}
+   966→                  </SelectContent>
+   967→                </Select>
+   968→              </div>
+   969→            </div>
+   970→          </div>
+   971→
+   972→          {/* Founders */}
+   973→          <div className="border-t pt-4">
+   974→            <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">Founders</div>
+   975→            <div className="border rounded-md p-3 max-h-40 overflow-y-auto space-y-2">
+   976→              {lookup?.founders.length === 0 && <div className="text-xs text-muted-foreground">No founders registered yet.</div>}
+   977→              {lookup?.founders.map((f) => (
+   978→                <label key={f.id} className="flex items-center gap-2 text-sm cursor-pointer">
+   979→                  <input
+   980→                    type="checkbox"
+   981→                    checked={founderIds.includes(f.id)}
+   982→                    onChange={(e) => setFounderIds((s) => e.target.checked ? [...s, f.id] : s.filter((x) => x !== f.id))}
+   983→                    className="accent-primary"
+   984→                  />
+   985→                  <span>{f.firstName} {f.lastName}</span>
+   986→                  <Badge variant="outline" className="text-xs ml-auto">{f.gender}</Badge>
+   987→                </label>
+   988→              ))}
+   989→            </div>
+   990→          </div>
+   991→
+   992→          {/* Custom columns */}
+   993→          {customColumns.length > 0 && (
+   994→            <div className="border-t pt-4">
+   995→              <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3 flex items-center gap-1.5">
+   996→                <Columns3 className="h-3.5 w-3.5" /> Custom Fields
+   997→              </div>
+   998→              <div className="grid sm:grid-cols-2 gap-3">
+   999→                {customColumns.map((col) => (
+  1000→                  <div key={col.id} className="space-y-1.5">
+  1001→                    <Label>{col.name}{col.required && <span className="text-destructive ml-1">*</span>}{col.description && <span className="text-xs text-muted-foreground ml-1.5">— {col.description}</span>}</Label>
+  1002→                    {col.columnType === 'number' ? (
+  1003→                      <Input
+  1004→                        type="number"
+  1005→                        value={customValues[col.id] || ''}
+  1006→                        onChange={(e) => setCustomValues((s) => ({ ...s, [col.id]: e.target.value }))}
+  1007→                        placeholder={col.required ? 'Required' : 'Optional'}
+  1008→                      />
+  1009→                    ) : col.columnType === 'date' ? (
+  1010→                      <Input
+  1011→                        type="date"
+  1012→                        value={customValues[col.id] || ''}
+  1013→                        onChange={(e) => setCustomValues((s) => ({ ...s, [col.id]: e.target.value }))}
+  1014→                      />
+  1015→                    ) : col.columnType === 'boolean' ? (
+  1016→                      <label className="flex items-center gap-2 h-9 cursor-pointer">
+  1017→                        <input
+  1018→                          type="checkbox"
+  1019→                          checked={customValues[col.id] === 'true' || customValues[col.id] === '1'}
+  1020→                          onChange={(e) => setCustomValues((s) => ({ ...s, [col.id]: e.target.checked ? 'true' : 'false' }))}
+  1021→                          className="accent-primary"
+  1022→                        />
+  1023→                        <span className="text-sm">{customValues[col.id] === 'true' ? 'Yes' : 'No'}</span>
+  1024→                      </label>
+  1025→                    ) : col.columnType === 'url' ? (
+  1026→                      <Input
+  1027→                        type="url"
+  1028→                        value={customValues[col.id] || ''}
+  1029→                        onChange={(e) => setCustomValues((s) => ({ ...s, [col.id]: e.target.value }))}
+  1030→                        placeholder="https://…"
+  1031→                      />
+  1032→                    ) : (
+  1033→                      <Input
+  1034→                        value={customValues[col.id] || ''}
+  1035→                        onChange={(e) => setCustomValues((s) => ({ ...s, [col.id]: e.target.value }))}
+  1036→                        placeholder={col.required ? 'Required' : 'Optional'}
+  1037→                      />
+  1038→                    )}
+  1039→                  </div>
+  1040→                ))}
+  1041→              </div>
+  1042→            </div>
+  1043→          )}
+  1044→
+  1045→          {/* API key management (edit only) */}
+  1046→          {company && (
+  1047→            <div className="border-t pt-3 space-y-3">
+  1048→              <label className="flex items-center gap-2 text-sm cursor-pointer">
+  1049→                <input type="checkbox" checked={apiKeyActive} onChange={(e) => setApiKeyActive(e.target.checked)} className="accent-primary" />
+  1050→                <span>API key active (companies can sign in with this key)</span>
+  1051→              </label>
+  1052→              <label className="flex items-center gap-2 text-sm cursor-pointer">
+  1053→                <input type="checkbox" checked={regenerateKey} onChange={(e) => setRegenerateKey(e.target.checked)} className="accent-primary" />
+  1054→                <span className="flex items-center gap-1"><KeyRound className="h-3.5 w-3.5" /> Regenerate API key (invalidates the old one)</span>
+  1055→              </label>
+  1056→              {regenerateKey && (
+  1057→                <p className="text-xs text-amber-600">The previous key stops working immediately. You'll need to share the new one with the company.</p>
+  1058→              )}
+  1059→            </div>
+  1060→          )}
+  1061→
+  1062→          <DialogFooter>
+  1063→            <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
+  1064→            <Button type="submit" disabled={saving}>
+  1065→              {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+  1066→              {company ? 'Save changes' : 'Create company'}
+  1067→            </Button>
+  1068→          </DialogFooter>
+  1069→        </form>
+  1070→      </DialogContent>
+  1071→    </Dialog>
+  1072→  )
+  1073→}
+  1074→

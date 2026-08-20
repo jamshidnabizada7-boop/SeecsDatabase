@@ -7,7 +7,8 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { api } from '@/lib/client-utils'
-import { Loader2, KeyRound, ArrowLeft, UserPlus, CheckCircle2, AlertTriangle } from 'lucide-react'
+import { Loader2, KeyRound, ArrowLeft, UserPlus, CheckCircle2, AlertTriangle, Building2, Eye, EyeOff, Sparkles } from 'lucide-react'
+import { ThemeToggle } from '@/components/theme-toggle'
 
 interface Lookup {
   sectors: { id: string; name: string }[]
@@ -22,9 +23,11 @@ export default function CompanyLogin({ onLoggedIn, onExit }: { onLoggedIn: (c: a
   const [error, setError] = useState('')
   const [success, setSuccess] = useState<{ name: string; apiKey: string } | null>(null)
   const [lookup, setLookup] = useState<Lookup | null>(null)
+  const [showKey, setShowKey] = useState(false)
 
   // login state
   const [apiKey, setApiKey] = useState('')
+  const [apiKeyTouched, setApiKeyTouched] = useState(false)
 
   // registration state
   const [name, setName] = useState('')
@@ -39,6 +42,13 @@ export default function CompanyLogin({ onLoggedIn, onExit }: { onLoggedIn: (c: a
   const [contactEmail, setContactEmail] = useState('')
   const [contactPhone, setContactPhone] = useState('')
 
+  // Validation
+  const apiKeyValid = apiKey.trim().length >= 8
+  const nameValid = name.trim().length >= 2
+  const contactNameValid = contactName.trim().length >= 2
+  const contactEmailValid = !contactEmail.trim() || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contactEmail.trim())
+  const websiteValid = !website.trim() || website.trim().startsWith('http') || /^[\w.-]+\.[a-z]{2,}$/i.test(website.trim())
+
   const loadLookup = async () => {
     try {
       const r = await api<Lookup>('/api/company/lookup')
@@ -48,6 +58,8 @@ export default function CompanyLogin({ onLoggedIn, onExit }: { onLoggedIn: (c: a
 
   const submitLogin = async (e: React.FormEvent) => {
     e.preventDefault()
+    setApiKeyTouched(true)
+    if (!apiKeyValid) return
     setLoading(true)
     setError('')
     try {
@@ -70,6 +82,7 @@ export default function CompanyLogin({ onLoggedIn, onExit }: { onLoggedIn: (c: a
 
   const submitRegister = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (!sectorId || !cityId || !nameValid || !contactNameValid || !contactEmailValid) return
     setLoading(true)
     setError('')
     try {
@@ -85,53 +98,73 @@ export default function CompanyLogin({ onLoggedIn, onExit }: { onLoggedIn: (c: a
     }
   }
 
-  // Success screen after registration — green check animation
+  // Success screen after registration
   if (success) {
     return (
-      <div className="min-h-screen grid place-items-center bg-gradient-to-b from-background to-muted/40 px-4">
-        <Card className="w-full max-w-md">
-          <CardHeader className="text-center">
-            <div className="mx-auto mb-4 flex justify-center">
-              <div className="relative h-16 w-16">
-                <div className="absolute inset-0 rounded-full bg-emerald-100 animate-ping opacity-20" />
-                <div className="relative h-16 w-16 rounded-full bg-gradient-to-br from-emerald-400 to-emerald-600 text-white grid place-items-center shadow-lg animate-[checkBounce_0.5s_ease-out]">
-                  <CheckCircle2 className="h-8 w-8" />
+      <div className="min-h-screen flex flex-col bg-gradient-to-b from-emerald-50 via-background to-background dark:from-emerald-950/30">
+        <header className="border-b bg-background/80 backdrop-blur-sm sticky top-0 z-10">
+          <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
+            <button onClick={onExit} className="flex items-center gap-2 text-sm text-stone-500 hover:text-foreground transition-colors">
+              <ArrowLeft className="h-4 w-4" /> Back to home
+            </button>
+            <ThemeToggle />
+          </div>
+        </header>
+
+        <main className="flex-1 grid place-items-center px-4 py-10">
+          <Card className="w-full max-w-md shadow-xl border-emerald-200 dark:border-emerald-800">
+            <CardHeader className="text-center pb-2">
+              <div className="mx-auto mb-5 flex justify-center">
+                <div className="relative">
+                  <div className="absolute inset-0 rounded-full bg-emerald-400/20 animate-ping" />
+                  <div className="relative h-20 w-20 rounded-full bg-gradient-to-br from-emerald-400 to-teal-600 text-white grid place-items-center shadow-lg animate-[checkBounce_0.5s_ease-out]">
+                    <CheckCircle2 className="h-10 w-10" />
+                  </div>
                 </div>
               </div>
-            </div>
-            <CardTitle className="text-xl">Registration successful!</CardTitle>
-            <CardDescription className="mt-2">
-              <strong>{success.name}</strong> has been registered. Save this API key — you&apos;ll need it to sign in to the company portal.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div>
-              <Label className="text-xs text-muted-foreground">Your unique API key</Label>
-              <div className="flex gap-2 mt-1">
-                <code className="flex-1 text-xs font-mono bg-muted px-3 py-2.5 rounded break-all">{success.apiKey}</code>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => navigator.clipboard?.writeText(success.apiKey)}
-                >
-                  Copy
-                </Button>
+              <CardTitle className="text-xl text-center">Registration successful!</CardTitle>
+              <CardDescription className="mt-2 text-center">
+                <strong className="text-foreground">{success.name}</strong> has been registered. Save your API key — you&apos;ll need it to sign in.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-5">
+              <div>
+                <Label className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Your unique API key</Label>
+                <div className="flex gap-2 mt-2">
+                  <code className="flex-1 text-xs font-mono bg-emerald-50 dark:bg-emerald-950/50 text-emerald-800 dark:text-emerald-200 px-3 py-3 rounded-lg break-all border border-emerald-200 dark:border-emerald-800">
+                    {success.apiKey}
+                  </code>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950"
+                    onClick={() => navigator.clipboard?.writeText(success.apiKey)}
+                  >
+                    Copy
+                  </Button>
+                </div>
               </div>
-            </div>
-            <Alert className="border-amber-200 bg-amber-50">
-              <AlertTriangle className="h-4 w-4 text-amber-600" />
-              <AlertDescription className="text-amber-800">
-                Treat this key like a password. Anyone with it can sign in as your company. The SEECS admin can revoke or regenerate it if needed.
-              </AlertDescription>
-            </Alert>
-            <Button
-              className="w-full"
-              onClick={() => { setApiKey(success.apiKey); setMode('login'); setSuccess(null) }}
-            >
-              Continue to portal
-            </Button>
-          </CardContent>
-        </Card>
+              <Alert className="border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/50">
+                <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                <AlertDescription className="text-amber-800 dark:text-amber-200">
+                  Treat this key like a password. Anyone with it can sign in as your company. Store it securely.
+                </AlertDescription>
+              </Alert>
+              <Button
+                className="w-full bg-emerald-600 hover:bg-emerald-700"
+                onClick={() => { setApiKey(success.apiKey); setMode('login'); setSuccess(null) }}
+              >
+                Continue to portal
+              </Button>
+            </CardContent>
+          </Card>
+        </main>
+
+        <footer className="border-t bg-background mt-auto">
+          <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4 text-xs text-muted-foreground text-center">
+            SEECS Company Registry · NUST Islamabad
+          </div>
+        </footer>
         <style>{`
           @keyframes checkBounce {
             0% { transform: scale(0.3); opacity: 0; }
@@ -144,32 +177,64 @@ export default function CompanyLogin({ onLoggedIn, onExit }: { onLoggedIn: (c: a
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-gradient-to-b from-background to-muted/30">
-      <header className="border-b bg-background/80 backdrop-blur sticky top-0 z-10">
+    <div className="min-h-screen flex flex-col relative overflow-hidden">
+      {/* Animated background pattern */}
+      <div className="fixed inset-0 -z-10 overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-br from-emerald-50/60 via-background to-teal-50/40 dark:from-emerald-950/20 dark:via-background dark:to-teal-950/15" />
+        <div className="absolute -top-40 -right-40 h-80 w-80 rounded-full bg-emerald-200/30 dark:bg-emerald-900/20 blur-3xl" />
+        <div className="absolute -bottom-40 -left-40 h-80 w-80 rounded-full bg-teal-200/30 dark:bg-teal-900/20 blur-3xl" />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-[600px] w-[600px] rounded-full bg-emerald-100/20 dark:bg-emerald-900/10 blur-3xl" />
+        {/* Subtle dot pattern */}
+        <div className="absolute inset-0 opacity-[0.03] dark:opacity-[0.02]" style={{
+          backgroundImage: 'radial-gradient(circle, currentColor 1px, transparent 1px)',
+          backgroundSize: '24px 24px'
+        }} />
+      </div>
+
+      <header className="border-b bg-background/80 backdrop-blur-sm sticky top-0 z-10">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
-          <button onClick={onExit} className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors">
-            <ArrowLeft className="h-4 w-4" /> Back to home
+          <button onClick={onExit} className="flex items-center gap-2 text-sm text-stone-500 hover:text-stone-700 dark:hover:text-stone-300 transition-colors group">
+            <ArrowLeft className="h-4 w-4 transition-transform group-hover:-translate-x-0.5" /> Back to home
           </button>
           <div className="flex items-center gap-2">
-            <Button variant={mode === 'login' ? 'default' : 'ghost'} size="sm" onClick={() => { setMode('login'); setError('') }}>
-              <KeyRound className="h-4 w-4 mr-1.5" /> Sign in
-            </Button>
-            <Button variant={mode === 'register' ? 'default' : 'ghost'} size="sm" onClick={() => { setMode('register'); setError(''); loadLookup() }}>
-              <UserPlus className="h-4 w-4 mr-1.5" /> Register
-            </Button>
+            <ThemeToggle />
+            <div className="flex rounded-lg border bg-muted/50 p-0.5">
+              <button
+                className={`flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md transition-all duration-200 ${
+                  mode === 'login'
+                    ? 'bg-background text-foreground shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+                onClick={() => { setMode('login'); setError('') }}
+              >
+                <KeyRound className="h-4 w-4" /> Sign in
+              </button>
+              <button
+                className={`flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md transition-all duration-200 ${
+                  mode === 'register'
+                    ? 'bg-background text-foreground shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+                onClick={() => { setMode('register'); setError(''); loadLookup() }}
+              >
+                <UserPlus className="h-4 w-4" /> Register
+              </button>
+            </div>
           </div>
         </div>
       </header>
 
       <main className="flex-1 grid place-items-center px-4 py-10">
         {mode === 'login' ? (
-          <Card className="w-full max-w-md shadow-lg">
+          <Card className="w-full max-w-md shadow-xl border-stone-200/80 dark:border-stone-800/80">
             <CardHeader className="text-center pb-2">
-              <div className="mx-auto h-12 w-12 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white grid place-items-center mb-3 shadow-md">
-                <KeyRound className="h-6 w-6" />
+              <div className="mx-auto h-14 w-14 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white grid place-items-center mb-4 shadow-lg shadow-emerald-500/20">
+                <Building2 className="h-7 w-7" />
               </div>
-              <CardTitle>Company portal</CardTitle>
-              <CardDescription>Enter your company&apos;s API key to manage your profile.</CardDescription>
+              <CardTitle className="text-xl">Company portal</CardTitle>
+              <CardDescription className="mt-1">
+                Enter your company&apos;s API key to manage your profile.
+              </CardDescription>
             </CardHeader>
             <CardContent>
               <form onSubmit={submitLogin} className="space-y-4">
@@ -179,33 +244,48 @@ export default function CompanyLogin({ onLoggedIn, onExit }: { onLoggedIn: (c: a
                     <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input
                       id="apiKey"
-                      type="password"
+                      type={showKey ? 'text' : 'password'}
                       value={apiKey}
-                      onChange={(e) => setApiKey(e.target.value)}
+                      onChange={(e) => { setApiKey(e.target.value); if (apiKeyTouched) setError('') }}
+                      onBlur={() => setApiKeyTouched(true)}
                       placeholder="sk_seecs_xxxxxxxxxxxxxxxxxxxx"
                       autoComplete="off"
                       required
-                      className="pl-9"
+                      className={`pl-9 pr-10 ${apiKeyTouched && !apiKeyValid ? 'border-destructive focus-visible:ring-destructive/30' : 'focus-visible:ring-emerald-500/30'}`}
                     />
+                    <button
+                      type="button"
+                      onClick={() => setShowKey(!showKey)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      {showKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
                   </div>
+                  {apiKeyTouched && !apiKeyValid && (
+                    <p className="text-xs text-destructive">API key must be at least 8 characters</p>
+                  )}
                 </div>
                 {error && (
                   <Alert variant="destructive">
-                    <AlertDescription>{error}</AlertDescription>
+                    <AlertDescription className="text-sm">{error}</AlertDescription>
                   </Alert>
                 )}
-                <Button type="submit" className="w-full" disabled={loading}>
-                  {loading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                <Button
+                  type="submit"
+                  className="w-full bg-emerald-600 hover:bg-emerald-700 shadow-sm"
+                  disabled={loading || (apiKeyTouched && !apiKeyValid)}
+                >
+                  {loading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <KeyRound className="h-4 w-4 mr-2" />}
                   Sign in
                 </Button>
-                <p className="text-xs text-muted-foreground text-center pt-2 border-t">
+                <p className="text-xs text-muted-foreground text-center pt-3 border-t">
                   Don&apos;t have a key yet?{' '}
                   <button
                     type="button"
-                    className="inline-flex items-center gap-1 text-emerald-600 hover:text-emerald-700 font-medium underline underline-offset-2 transition-colors"
+                    className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 font-medium underline underline-offset-2 transition-colors"
                     onClick={() => { setMode('register'); setError(''); loadLookup() }}
                   >
-                    <UserPlus className="h-3 w-3" />
+                    <Sparkles className="h-3 w-3" />
                     Register your company
                   </button>
                 </p>
@@ -213,106 +293,161 @@ export default function CompanyLogin({ onLoggedIn, onExit }: { onLoggedIn: (c: a
             </CardContent>
           </Card>
         ) : (
-          <Card className="w-full max-w-2xl shadow-lg">
+          <Card className="w-full max-w-2xl shadow-xl border-stone-200/80 dark:border-stone-800/80">
             <CardHeader>
-              <CardTitle>Register your company</CardTitle>
-              <CardDescription>
-                Fill in your company details. A unique API key will be generated for you to manage your own data.
-                You will not be able to see or edit any other company&apos;s data.
-              </CardDescription>
+              <div className="flex items-center gap-3 mb-1">
+                <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white grid place-items-center shadow-sm">
+                  <UserPlus className="h-5 w-5" />
+                </div>
+                <div>
+                  <CardTitle>Register your company</CardTitle>
+                  <CardDescription>
+                    Fill in your company details. A unique API key will be generated.
+                  </CardDescription>
+                </div>
+              </div>
             </CardHeader>
             <CardContent>
-              <form onSubmit={submitRegister} className="space-y-4">
-                <div className="grid sm:grid-cols-2 gap-3">
-                  <div className="space-y-1.5 sm:col-span-2">
-                    <Label>Company name *</Label>
-                    <Input value={name} onChange={(e) => setName(e.target.value)} required />
+              <form onSubmit={submitRegister} className="space-y-5">
+                {/* Company Info Section */}
+                <div>
+                  <div className="text-xs font-semibold uppercase tracking-wider text-stone-500 dark:text-stone-400 mb-3">Company Information</div>
+                  <div className="grid sm:grid-cols-2 gap-3">
+                    <div className="space-y-1.5 sm:col-span-2">
+                      <Label>Company name <span className="text-destructive">*</span></Label>
+                      <Input
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                        placeholder="e.g. TechVentures Pvt. Ltd."
+                        required
+                        className={!nameValid && name.length > 0 ? 'border-destructive' : ''}
+                      />
+                      {!nameValid && name.length > 0 && <p className="text-xs text-destructive">Name must be at least 2 characters</p>}
+                    </div>
+                    <div className="space-y-1.5 sm:col-span-2">
+                      <Label>Description</Label>
+                      <textarea
+                        className="flex min-h-[60px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/30"
+                        value={description}
+                        onChange={(e) => setDescription(e.target.value)}
+                        rows={2}
+                        placeholder="Brief description of your company..."
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label>Company email</Label>
+                      <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="info@company.com" />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label>Company phone</Label>
+                      <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+92 300 0000000" />
+                    </div>
+                    <div className="space-y-1.5 sm:col-span-2">
+                      <Label>Website</Label>
+                      <Input
+                        value={website}
+                        onChange={(e) => setWebsite(e.target.value)}
+                        placeholder="https://company.com"
+                        className={!websiteValid && website.length > 0 ? 'border-destructive' : ''}
+                      />
+                      {!websiteValid && website.length > 0 && <p className="text-xs text-destructive">Please enter a valid URL</p>}
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label>Sector <span className="text-destructive">*</span></Label>
+                      <select
+                        className={`flex h-9 w-full rounded-md border bg-background px-3 py-1 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 ${!sectorId ? 'border-destructive focus-visible:ring-destructive/30' : 'border-input focus-visible:ring-emerald-500/30'}`}
+                        value={sectorId}
+                        onChange={(e) => setSectorId(e.target.value)}
+                        required
+                      >
+                        <option value="">Select sector…</option>
+                        {lookup?.sectors.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                      </select>
+                      {!sectorId && <p className="text-xs text-destructive">Sector is required</p>}
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label>City <span className="text-destructive">*</span></Label>
+                      <select
+                        className={`flex h-9 w-full rounded-md border bg-background px-3 py-1 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 ${!cityId ? 'border-destructive focus-visible:ring-destructive/30' : 'border-input focus-visible:ring-emerald-500/30'}`}
+                        value={cityId}
+                        onChange={(e) => setCityId(e.target.value)}
+                        required
+                      >
+                        <option value="">Select city…</option>
+                        {lookup?.cities.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                      </select>
+                      {!cityId && <p className="text-xs text-destructive">City is required</p>}
+                    </div>
+                    <div className="space-y-1.5 sm:col-span-2">
+                      <Label>Office location (optional)</Label>
+                      <select
+                        className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/30"
+                        value={locationId}
+                        onChange={(e) => setLocationId(e.target.value)}
+                      >
+                        <option value="">— None —</option>
+                        {lookup?.locations.map((l) => <option key={l.id} value={l.id}>{l.address} · {l.city.name}</option>)}
+                      </select>
+                    </div>
                   </div>
-                  <div className="space-y-1.5 sm:col-span-2">
-                    <Label>Description</Label>
-                    <textarea
-                      className="flex min-h-[60px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                      value={description}
-                      onChange={(e) => setDescription(e.target.value)}
-                      rows={2}
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label>Company email</Label>
-                    <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label>Company phone</Label>
-                    <Input value={phone} onChange={(e) => setPhone(e.target.value)} />
-                  </div>
-                  <div className="space-y-1.5 sm:col-span-2">
-                    <Label>Website</Label>
-                    <Input value={website} onChange={(e) => setWebsite(e.target.value)} placeholder="https://…" />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label>Sector *</Label>
-                    <select
-                      className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                      value={sectorId}
-                      onChange={(e) => setSectorId(e.target.value)}
-                      required
-                    >
-                      <option value="">Select sector…</option>
-                      {lookup?.sectors.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-                    </select>
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label>City *</Label>
-                    <select
-                      className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                      value={cityId}
-                      onChange={(e) => setCityId(e.target.value)}
-                      required
-                    >
-                      <option value="">Select city…</option>
-                      {lookup?.cities.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                    </select>
-                  </div>
-                  <div className="space-y-1.5 sm:col-span-2">
-                    <Label>Office location (optional)</Label>
-                    <select
-                      className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                      value={locationId}
-                      onChange={(e) => setLocationId(e.target.value)}
-                    >
-                      <option value="">— None —</option>
-                      {lookup?.locations.map((l) => <option key={l.id} value={l.id}>{l.address} · {l.city.name}</option>)}
-                    </select>
-                  </div>
+                </div>
 
-                  <div className="sm:col-span-2 mt-2 pt-3 border-t">
-                    <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">Primary contact</div>
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label>Contact name *</Label>
-                    <Input value={contactName} onChange={(e) => setContactName(e.target.value)} required />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label>Contact email *</Label>
-                    <Input type="email" value={contactEmail} onChange={(e) => setContactEmail(e.target.value)} required />
-                  </div>
-                  <div className="space-y-1.5 sm:col-span-2">
-                    <Label>Contact phone</Label>
-                    <Input value={contactPhone} onChange={(e) => setContactPhone(e.target.value)} />
+                <Separator />
+
+                {/* Contact Section */}
+                <div>
+                  <div className="text-xs font-semibold uppercase tracking-wider text-stone-500 dark:text-stone-400 mb-3">Primary Contact</div>
+                  <div className="grid sm:grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <Label>Contact name <span className="text-destructive">*</span></Label>
+                      <Input
+                        value={contactName}
+                        onChange={(e) => setContactName(e.target.value)}
+                        placeholder="Full name"
+                        required
+                        className={!contactNameValid && contactName.length > 0 ? 'border-destructive' : ''}
+                      />
+                      {!contactNameValid && contactName.length > 0 && <p className="text-xs text-destructive">Name must be at least 2 characters</p>}
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label>Contact email <span className="text-destructive">*</span></Label>
+                      <Input
+                        type="email"
+                        value={contactEmail}
+                        onChange={(e) => setContactEmail(e.target.value)}
+                        placeholder="person@company.com"
+                        required
+                        className={!contactEmailValid && contactEmail.length > 0 ? 'border-destructive' : ''}
+                      />
+                      {!contactEmailValid && contactEmail.length > 0 && <p className="text-xs text-destructive">Please enter a valid email</p>}
+                    </div>
+                    <div className="space-y-1.5 sm:col-span-2">
+                      <Label>Contact phone</Label>
+                      <Input value={contactPhone} onChange={(e) => setContactPhone(e.target.value)} placeholder="+92 300 0000000" />
+                    </div>
                   </div>
                 </div>
 
                 {error && (
                   <Alert variant="destructive">
-                    <AlertDescription>{error}</AlertDescription>
+                    <AlertDescription className="text-sm">{error}</AlertDescription>
                   </Alert>
                 )}
 
-                <div className="flex gap-2">
-                  <Button type="button" variant="ghost" onClick={() => { setMode('login'); setError('') }}>
-                    Cancel
+                <div className="flex gap-3 pt-1">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => { setMode('login'); setError('') }}
+                    className="min-w-[100px]"
+                  >
+                    <ArrowLeft className="h-4 w-4 mr-1.5" /> Back
                   </Button>
-                  <Button type="submit" className="flex-1" disabled={loading}>
+                  <Button
+                    type="submit"
+                    className="flex-1 bg-emerald-600 hover:bg-emerald-700"
+                    disabled={loading || !sectorId || !cityId || !nameValid || !contactNameValid || !contactEmailValid}
+                  >
                     {loading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                     Register company
                   </Button>
@@ -323,7 +458,7 @@ export default function CompanyLogin({ onLoggedIn, onExit }: { onLoggedIn: (c: a
         )}
       </main>
 
-      <footer className="border-t bg-background mt-auto">
+      <footer className="border-t bg-background/80 backdrop-blur-sm mt-auto">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4 text-xs text-muted-foreground text-center">
           Each company can only see and modify its own data. Misuse of an API key should be reported to the SEECS admin.
         </div>

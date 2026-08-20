@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useState, useMemo, useCallback, useRef } from 'react'
 import { api, formatDate, formatCurrency } from '@/lib/client-utils'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -14,7 +14,16 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
 import { useToast } from '@/hooks/use-toast'
-import { Building2, Loader2, Plus, RefreshCw, Search, KeyRound, Pencil, Trash2, Copy, Eye, EyeOff, Columns3, ChevronDown, ChevronUp, Download, LayoutGrid, List, RotateCw } from 'lucide-react'
+import { Building2, Loader2, Plus, RefreshCw, Search, KeyRound, Pencil, Trash2, Copy, Eye, EyeOff, Columns3, ChevronDown, ChevronUp, Download, LayoutGrid, List, RotateCw, X } from 'lucide-react'
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationPrevious,
+  PaginationNext,
+  PaginationEllipsis,
+} from '@/components/ui/pagination'
 
 interface CustomColumn {
   id: string
@@ -75,9 +84,9 @@ interface Lookup {
 }
 
 const STATUS_STYLES: Record<string, string> = {
-  Active: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-  Inactive: 'bg-amber-50 text-amber-700 border-amber-200',
-  Discontinued: 'bg-rose-50 text-rose-700 border-rose-200',
+  Active: 'bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800',
+  Inactive: 'bg-amber-50 dark:bg-amber-950 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800',
+  Discontinued: 'bg-rose-50 dark:bg-rose-950 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800',
 }
 
 type ViewMode = 'card' | 'table'
@@ -96,34 +105,73 @@ export default function CompaniesPage() {
   const [showCustom, setShowCustom] = useState<Record<string, boolean>>({})
   const [viewMode, setViewMode] = useState<ViewMode>('card')
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('All')
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(20)
+  const [total, setTotal] = useState(0)
+  const [totalPages, setTotalPages] = useState(1)
   const { toast } = useToast()
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  const load = async () => {
+  const buildParams = useCallback((
+    opts?: { searchVal?: string; statusVal?: StatusFilter; pageVal?: number; pageSizeVal?: number }
+  ) => {
+    const q = opts?.searchVal ?? search
+    const st = opts?.statusVal ?? statusFilter
+    const p = opts?.pageVal ?? page
+    const ps = opts?.pageSizeVal ?? pageSize
+    const params = new URLSearchParams()
+    if (p) params.set('page', String(p))
+    if (ps) params.set('limit', String(ps))
+    if (q) params.set('q', q)
+    if (st !== 'All') params.set('status', st)
+    return params.toString() ? `?${params.toString()}` : ''
+  }, [search, statusFilter, page, pageSize])
+
+  const load = useCallback(async (overrideParams?: string) => {
     setLoading(true)
     try {
+      const qs = overrideParams ?? buildParams()
       const [companiesRes, lookupRes] = await Promise.all([
-        api<{ items: Company[]; customColumns: CustomColumn[] }>(`/api/admin/companies?q=${encodeURIComponent(search)}`),
+        api<{ items: Company[]; customColumns: CustomColumn[]; total: number; page: number; limit: number; totalPages: number }>(`/api/admin/companies${qs}`),
         api<Lookup>('/api/lookup'),
       ])
       setItems(companiesRes.items)
       setCustomColumns(companiesRes.customColumns)
       setLookup(lookupRes)
+      setTotal(companiesRes.total)
+      setTotalPages(companiesRes.totalPages)
     } catch (e: any) {
       toast({ title: 'Error', description: e.message, variant: 'destructive' })
     } finally {
       setLoading(false)
     }
+  }, [buildParams, toast])
+
+  // Main data loading: debounced for search, immediate for page/status/pageSize changes
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    const delay = search ? 300 : 0
+    debounceRef.current = setTimeout(() => {
+      load()
+    }, delay)
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current) }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [search, statusFilter, page, pageSize])
+
+  const handlePageSizeChange = (val: string) => {
+    setPageSize(Number(val))
+    setPage(1)
   }
 
-  useEffect(() => {
-    const t = setTimeout(load, 250)
-    return () => clearTimeout(t)
-  }, [search])
+  const handleStatusFilter = (val: StatusFilter) => {
+    setStatusFilter(val)
+    setPage(1)
+  }
 
-  const filteredItems = useMemo(() => {
-    if (statusFilter === 'All') return items
-    return items.filter((c) => c.status === statusFilter)
-  }, [items, statusFilter])
+  const handleSearchClear = () => {
+    setSearch('')
+    setPage(1)
+  }
 
   const copyKey = (k: string) => {
     navigator.clipboard?.writeText(k)
@@ -143,9 +191,20 @@ export default function CompaniesPage() {
     }
   }
 
-  const exportCSV = () => {
+  const exportCSV = async () => {
+    let exportItems: Company[] = items
+    try {
+      const exportParams = new URLSearchParams()
+      if (search) exportParams.set('q', search)
+      if (statusFilter !== 'All') exportParams.set('status', statusFilter)
+      const qs = exportParams.toString() ? `?${exportParams.toString()}` : ''
+      const res = await api<{ items: Company[] }>(`/api/admin/companies${qs}`)
+      exportItems = res.items
+    } catch {
+      // fall back to current page items
+    }
     const headers = ['Name', 'Email', 'Phone', 'Website', 'Status', 'Since Date', 'Founded Year', 'Branches', 'Revenue', 'Sector', 'City', 'API Key']
-    const rows = filteredItems.map((c) => [
+    const rows = exportItems.map((c) => [
       c.name,
       c.email || '',
       c.phone || '',
@@ -169,26 +228,40 @@ export default function CompaniesPage() {
     a.download = `companies-export-${new Date().toISOString().slice(0, 10)}.csv`
     a.click()
     URL.revokeObjectURL(url)
-    toast({ title: 'Exported', description: `${filteredItems.length} companies exported as CSV` })
+    toast({ title: 'Exported', description: `${exportItems.length} companies exported as CSV` })
   }
 
   const getCustomValue = (company: Company, columnId: string) => {
     return company.customValues?.find((cv) => cv.customColumnId === columnId)?.value || ''
   }
 
-  const statusFilters: { label: string; value: StatusFilter; count: number }[] = [
-    { label: 'All', value: 'All', count: items.length },
-    { label: 'Active', value: 'Active', count: items.filter((c) => c.status === 'Active').length },
-    { label: 'Inactive', value: 'Inactive', count: items.filter((c) => c.status === 'Inactive').length },
-    { label: 'Discontinued', value: 'Discontinued', count: items.filter((c) => c.status === 'Discontinued').length },
+  const statusFilterOptions: { label: string; value: StatusFilter }[] = [
+    { label: 'All', value: 'All' },
+    { label: 'Active', value: 'Active' },
+    { label: 'Inactive', value: 'Inactive' },
+    { label: 'Discontinued', value: 'Discontinued' },
   ]
+
+  const showingFrom = total === 0 ? 0 : (page - 1) * pageSize + 1
+  const showingTo = Math.min(page * pageSize, total)
+
+  const paginationRange = useMemo(() => {
+    const range: number[] = []
+    const delta = 2
+    const left = Math.max(1, page - delta)
+    const right = Math.min(totalPages, page + delta)
+    for (let i = left; i <= right; i++) range.push(i)
+    return range
+  }, [page, totalPages])
 
   return (
     <div className="p-4 sm:p-6 space-y-4 max-w-7xl mx-auto">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold">Companies</h1>
-          <p className="text-sm text-muted-foreground">{filteredItems.length} shown · master list with per-company API keys.</p>
+          <p className="text-sm text-muted-foreground">
+            {total} companies total{statusFilter !== 'All' ? <span> · <span className="text-stone-600 font-medium">{statusFilter}</span></span> : null}{search ? <span> · matching <span className="text-stone-600 font-medium">&lsquo;{search}&rsquo;</span></span> : null}
+          </p>
         </div>
         <div className="flex gap-2 flex-wrap">
           <Button variant="outline" size="sm" onClick={load} disabled={loading}>
@@ -208,28 +281,33 @@ export default function CompaniesPage() {
         <div className="relative max-w-sm flex-1">
           <Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
           <Input
-            placeholder="Search by name…"
+            placeholder="Search by name, description, website…"
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-9"
+            onChange={(e) => { setSearch(e.target.value); setPage(1) }}
+            className="pl-9 pr-8"
           />
+          {search && (
+            <button
+              onClick={handleSearchClear}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          )}
         </div>
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1.5 flex-wrap">
           {/* Status filter badges */}
-          {statusFilters.map((sf) => (
+          {statusFilterOptions.map((sf) => (
             <button
               key={sf.value}
-              onClick={() => setStatusFilter(sf.value)}
+              onClick={() => handleStatusFilter(sf.value)}
               className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
                 statusFilter === sf.value
-                  ? 'bg-primary text-primary-foreground border-primary'
-                  : 'bg-background text-muted-foreground border-border hover:bg-muted hover:text-foreground'
+                  ? 'bg-emerald-600 text-white border-emerald-600'
+                  : 'bg-background text-stone-600 border-stone-200 hover:bg-stone-50 hover:text-stone-900'
               }`}
             >
               {sf.label}
-              <span className={`tabular-nums ${statusFilter === sf.value ? 'text-primary-foreground/80' : 'text-muted-foreground/70'}`}>
-                {sf.count}
-              </span>
             </button>
           ))}
           <div className="w-px h-6 bg-border mx-1" />
@@ -259,7 +337,7 @@ export default function CompaniesPage() {
         <div className="py-12 text-center text-muted-foreground text-sm"><Loader2 className="h-5 w-5 animate-spin inline mr-2" />Loading…</div>
       ) : viewMode === 'card' ? (
         <div className="grid gap-3">
-          {filteredItems.map((c) => {
+          {items.map((c) => {
             const revealed = revealedKeys[c.id]
             const showCust = showCustom[c.id]
             return (
@@ -395,10 +473,14 @@ export default function CompaniesPage() {
               </Card>
             )
           })}
-          {filteredItems.length === 0 && (
+          {items.length === 0 && (
             <div className="py-16 text-center text-muted-foreground">
               <Building2 className="h-8 w-8 mx-auto mb-3 opacity-50" />
-              {statusFilter !== 'All' ? `No companies with status "${statusFilter}".` : 'No companies yet. Add one or let companies self-register.'}
+              {search
+                ? 'No companies found matching your search.'
+                : statusFilter !== 'All'
+                  ? `No companies with status "${statusFilter}".`
+                  : 'No companies yet. Add one or let companies self-register.'}
             </div>
           )}
         </div>
@@ -420,7 +502,7 @@ export default function CompaniesPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredItems.map((c) => {
+                {items.map((c) => {
                   const revealed = revealedKeys[c.id]
                   return (
                     <TableRow key={c.id}>
@@ -491,14 +573,92 @@ export default function CompaniesPage() {
                 })}
               </TableBody>
             </Table>
-            {filteredItems.length === 0 && (
+            {items.length === 0 && (
               <div className="py-16 text-center text-muted-foreground">
                 <Building2 className="h-8 w-8 mx-auto mb-3 opacity-50" />
-                {statusFilter !== 'All' ? `No companies with status "${statusFilter}".` : 'No companies yet.'}
+                {search
+                  ? 'No companies found matching your search.'
+                  : statusFilter !== 'All'
+                    ? `No companies with status "${statusFilter}".`
+                    : 'No companies yet.'}
               </div>
             )}
           </CardContent>
         </Card>
+      )}
+
+      {/* Pagination & info */}
+      {total > 0 && (
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <span className="text-sm text-stone-500">
+              Showing {showingFrom} to {showingTo} of {total} companies
+            </span>
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs text-stone-500">Per page:</span>
+              <Select value={String(pageSize)} onValueChange={handlePageSizeChange}>
+                <SelectTrigger className="h-8 w-[70px] text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="10">10</SelectItem>
+                  <SelectItem value="20">20</SelectItem>
+                  <SelectItem value="50">50</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          {totalPages > 1 && (
+            <Pagination>
+              <PaginationContent>
+                <PaginationItem>
+                  <PaginationPrevious
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                    className={page <= 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                  />
+                </PaginationItem>
+                {paginationRange[0] > 1 && (
+                  <>
+                    <PaginationItem>
+                      <PaginationLink onClick={() => setPage(1)} className="cursor-pointer">1</PaginationLink>
+                    </PaginationItem>
+                    {paginationRange[0] > 2 && <PaginationEllipsis />}
+                  </>
+                )}
+                {paginationRange.map((p) => (
+                  <PaginationItem key={p}>
+                    <PaginationLink
+                      isActive={p === page}
+                      onClick={() => setPage(p)}
+                      className="cursor-pointer"
+                    >
+                      {p}
+                    </PaginationLink>
+                  </PaginationItem>
+                ))}
+                {paginationRange[paginationRange.length - 1] < totalPages && (
+                  <>
+                    {paginationRange[paginationRange.length - 1] < totalPages - 1 && <PaginationEllipsis />}
+                    <PaginationItem>
+                      <PaginationLink
+                        onClick={() => setPage(totalPages)}
+                        className="cursor-pointer"
+                      >
+                        {totalPages}
+                      </PaginationLink>
+                    </PaginationItem>
+                  </>
+                )}
+                <PaginationItem>
+                  <PaginationNext
+                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                    className={page >= totalPages ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                  />
+                </PaginationItem>
+              </PaginationContent>
+            </Pagination>
+          )}
+        </div>
       )}
 
       {/* Create dialog */}

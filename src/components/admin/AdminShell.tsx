@@ -21,6 +21,7 @@ import {
   ChevronRight,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { ThemeToggle } from '@/components/theme-toggle'
 import DashboardPage from './pages/DashboardPage'
 import CompaniesPage from './pages/CompaniesPage'
 import SectorsPage from './pages/SectorsPage'
@@ -114,14 +115,17 @@ export default function AdminShell({ admin, onLogout }: { admin: any; onLogout: 
             <div className="text-xs text-stone-500 truncate">{admin.email}</div>
           </div>
         </div>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="w-full justify-start text-stone-400 hover:text-stone-200 hover:bg-stone-800/60"
-          onClick={onLogout}
-        >
-          <LogOut className="h-4 w-4 mr-2" /> Sign out
-        </Button>
+        <div className="flex items-center gap-1">
+          <ThemeToggle className="h-9 w-9 text-stone-400 hover:text-stone-200 hover:bg-stone-800/60" variant="ghost" />
+          <Button
+            variant="ghost"
+            size="sm"
+            className="flex-1 justify-start text-stone-400 hover:text-stone-200 hover:bg-stone-800/60"
+            onClick={onLogout}
+          >
+            <LogOut className="h-4 w-4 mr-2" /> Sign out
+          </Button>
+        </div>
       </div>
     </div>
   )
@@ -139,7 +143,7 @@ export default function AdminShell({ admin, onLogout }: { admin: any; onLogout: 
           </SheetContent>
         </Sheet>
         <div className="font-semibold text-sm">SEECS · {currentLabel}</div>
-        <div className="w-9" />
+        <ThemeToggle className="text-foreground" />
       </div>
 
       <div className="flex flex-1">

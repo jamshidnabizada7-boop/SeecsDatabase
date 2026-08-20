@@ -1,0 +1,847 @@
+    70→  sectors: { id: string; name: string }[]
+    71→  cities: { id: string; name: string }[]
+    72→  locations: { id: string; address: string; city: { name: string } }[]
+    73→  degrees: { id: string; name: string; field: string | null }[]
+    74→  founders: { id: string; firstName: string; lastName: string; gender: string }[]
+    75→}
+    76→
+    77→const STATUS_STYLES: Record<string, string> = {
+    78→  Active: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+    79→  Inactive: 'bg-amber-50 text-amber-700 border-amber-200',
+    80→  Discontinued: 'bg-rose-50 text-rose-700 border-rose-200',
+    81→}
+    82→
+    83→type ViewMode = 'card' | 'table'
+    84→type StatusFilter = 'All' | 'Active' | 'Inactive' | 'Discontinued'
+    85→
+    86→export default function CompaniesPage() {
+    87→  const [items, setItems] = useState<Company[]>([])
+    88→  const [customColumns, setCustomColumns] = useState<CustomColumn[]>([])
+    89→  const [lookup, setLookup] = useState<Lookup | null>(null)
+    90→  const [loading, setLoading] = useState(true)
+    91→  const [search, setSearch] = useState('')
+    92→  const [editing, setEditing] = useState<Company | null>(null)
+    93→  const [creating, setCreating] = useState(false)
+    94→  const [deleting, setDeleting] = useState<Company | null>(null)
+    95→  const [revealedKeys, setRevealedKeys] = useState<Record<string, boolean>>({})
+    96→  const [showCustom, setShowCustom] = useState<Record<string, boolean>>({})
+    97→  const [viewMode, setViewMode] = useState<ViewMode>('card')
+    98→  const [statusFilter, setStatusFilter] = useState<StatusFilter>('All')
+    99→  const { toast } = useToast()
+   100→
+   101→  const load = async () => {
+   102→    setLoading(true)
+   103→    try {
+   104→      const [companiesRes, lookupRes] = await Promise.all([
+   105→        api<{ items: Company[]; customColumns: CustomColumn[] }>(`/api/admin/companies?q=${encodeURIComponent(search)}`),
+   106→        api<Lookup>('/api/lookup'),
+   107→      ])
+   108→      setItems(companiesRes.items)
+   109→      setCustomColumns(companiesRes.customColumns)
+   110→      setLookup(lookupRes)
+   111→    } catch (e: any) {
+   112→      toast({ title: 'Error', description: e.message, variant: 'destructive' })
+   113→    } finally {
+   114→      setLoading(false)
+   115→    }
+   116→  }
+   117→
+   118→  useEffect(() => {
+   119→    const t = setTimeout(load, 250)
+   120→    return () => clearTimeout(t)
+   121→  }, [search])
+   122→
+   123→  const filteredItems = useMemo(() => {
+   124→    if (statusFilter === 'All') return items
+   125→    return items.filter((c) => c.status === statusFilter)
+   126→  }, [items, statusFilter])
+   127→
+   128→  const copyKey = (k: string) => {
+   129→    navigator.clipboard?.writeText(k)
+   130→    toast({ title: 'Copied', description: 'API key copied to clipboard' })
+   131→  }
+   132→
+   133→  const regenerateKey = async (company: Company) => {
+   134→    try {
+   135→      await api(`/api/admin/companies/${company.id}`, {
+   136→        method: 'PUT',
+   137→        body: { ...company, regenerateKey: true },
+   138→      })
+   139→      toast({ title: 'Regenerated', description: 'A new API key has been generated' })
+   140→      load()
+   141→    } catch (e: any) {
+   142→      toast({ title: 'Error', description: e.message, variant: 'destructive' })
+   143→    }
+   144→  }
+   145→
+   146→  const exportCSV = () => {
+   147→    const headers = ['Name', 'Email', 'Phone', 'Website', 'Status', 'Since Date', 'Founded Year', 'Branches', 'Revenue', 'Sector', 'City', 'API Key']
+   148→    const rows = filteredItems.map((c) => [
+   149→      c.name,
+   150→      c.email || '',
+   151→      c.phone || '',
+   152→      c.website || '',
+   153→      c.status || '',
+   154→      c.sinceDate || '',
+   155→      c.foundedYear || '',
+   156→      c.branchesCount || '',
+   157→      c.revenue || '',
+   158→      c.sector.name,
+   159→      c.city.name,
+   160→      c.apiKey,
+   161→    ])
+   162→    const csvContent = [headers, ...rows]
+   163→      .map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+   164→      .join('\n')
+   165→    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+   166→    const url = URL.createObjectURL(blob)
+   167→    const a = document.createElement('a')
+   168→    a.href = url
+   169→    a.download = `companies-export-${new Date().toISOString().slice(0, 10)}.csv`
+   170→    a.click()
+   171→    URL.revokeObjectURL(url)
+   172→    toast({ title: 'Exported', description: `${filteredItems.length} companies exported as CSV` })
+   173→  }
+   174→
+   175→  const getCustomValue = (company: Company, columnId: string) => {
+   176→    return company.customValues?.find((cv) => cv.customColumnId === columnId)?.value || ''
+   177→  }
+   178→
+   179→  const statusFilters: { label: string; value: StatusFilter; count: number }[] = [
+   180→    { label: 'All', value: 'All', count: items.length },
+   181→    { label: 'Active', value: 'Active', count: items.filter((c) => c.status === 'Active').length },
+   182→    { label: 'Inactive', value: 'Inactive', count: items.filter((c) => c.status === 'Inactive').length },
+   183→    { label: 'Discontinued', value: 'Discontinued', count: items.filter((c) => c.status === 'Discontinued').length },
+   184→  ]
+   185→
+   186→  return (
+   187→    <div className="p-4 sm:p-6 space-y-4 max-w-7xl mx-auto">
+   188→      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+   189→        <div>
+   190→          <h1 className="text-2xl font-semibold">Companies</h1>
+   191→          <p className="text-sm text-muted-foreground">{filteredItems.length} shown · master list with per-company API keys.</p>
+   192→        </div>
+   193→        <div className="flex gap-2 flex-wrap">
+   194→          <Button variant="outline" size="sm" onClick={load} disabled={loading}>
+   195→            {loading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-2" />}
+   196→            Refresh
+   197→          </Button>
+   198→          <Button variant="outline" size="sm" onClick={exportCSV}>
+   199→            <Download className="h-4 w-4 mr-2" /> Export CSV
+   200→          </Button>
+   201→          <Button size="sm" onClick={() => setCreating(true)}>
+   202→            <Plus className="h-4 w-4 mr-2" /> Add company
+   203→          </Button>
+   204→        </div>
+   205→      </div>
+   206→
+   207→      <div className="flex flex-col sm:flex-row gap-3">
+   208→        <div className="relative max-w-sm flex-1">
+   209→          <Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+   210→          <Input
+   211→            placeholder="Search by name…"
+   212→            value={search}
+   213→            onChange={(e) => setSearch(e.target.value)}
+   214→            className="pl-9"
+   215→          />
+   216→        </div>
+   217→        <div className="flex items-center gap-1.5">
+   218→          {/* Status filter badges */}
+   219→          {statusFilters.map((sf) => (
+   220→            <button
+   221→              key={sf.value}
+   222→              onClick={() => setStatusFilter(sf.value)}
+   223→              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
+   224→                statusFilter === sf.value
+   225→                  ? 'bg-primary text-primary-foreground border-primary'
+   226→                  : 'bg-background text-muted-foreground border-border hover:bg-muted hover:text-foreground'
+   227→              }`}
+   228→            >
+   229→              {sf.label}
+   230→              <span className={`tabular-nums ${statusFilter === sf.value ? 'text-primary-foreground/80' : 'text-muted-foreground/70'}`}>
+   231→                {sf.count}
+   232→              </span>
+   233→            </button>
+   234→          ))}
+   235→          <div className="w-px h-6 bg-border mx-1" />
+   236→          {/* View mode toggle */}
+   237→          <Button
+   238→            variant={viewMode === 'card' ? 'default' : 'ghost'}
+   239→            size="icon"
+   240→            className="h-8 w-8"
+   241→            onClick={() => setViewMode('card')}
+   242→            title="Card view"
+   243→          >
+   244→            <LayoutGrid className="h-4 w-4" />
+   245→          </Button>
+   246→          <Button
+   247→            variant={viewMode === 'table' ? 'default' : 'ghost'}
+   248→            size="icon"
+   249→            className="h-8 w-8"
+   250→            onClick={() => setViewMode('table')}
+   251→            title="Table view"
+   252→          >
+   253→            <List className="h-4 w-4" />
+   254→          </Button>
+   255→        </div>
+   256→      </div>
+   257→
+   258→      {loading && items.length === 0 ? (
+   259→        <div className="py-12 text-center text-muted-foreground text-sm"><Loader2 className="h-5 w-5 animate-spin inline mr-2" />Loading…</div>
+   260→      ) : viewMode === 'card' ? (
+   261→        <div className="grid gap-3">
+   262→          {filteredItems.map((c) => {
+   263→            const revealed = revealedKeys[c.id]
+   264→            const showCust = showCustom[c.id]
+   265→            return (
+   266→              <Card key={c.id} className="overflow-hidden">
+   267→                <CardContent className="p-4 sm:p-5">
+   268→                  <div className="flex flex-col lg:flex-row gap-4">
+   269→                    {/* Left: identity */}
+   270→                    <div className="flex-1 min-w-0">
+   271→                      <div className="flex items-start justify-between gap-3">
+   272→                        <div className="min-w-0">
+   273→                          <div className="flex items-center gap-2 flex-wrap">
+   274→                            <h3 className="font-semibold truncate">{c.name}</h3>
+   275→                            {c.status ? (
+   276→                              <Badge variant="outline" className={`text-xs ${STATUS_STYLES[c.status] || ''}`}>{c.status}</Badge>
+   277→                            ) : c.apiKeyActive ? (
+   278→                              <Badge variant="secondary" className="text-emerald-600 bg-emerald-50 border-emerald-200">Active</Badge>
+   279→                            ) : (
+   280→                              <Badge variant="destructive" className="bg-rose-50 text-rose-700 border-rose-200">Revoked</Badge>
+   281→                            )}
+   282→                          </div>
+   283→                          <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{c.description || 'No description.'}</p>
+   284→                        </div>
+   285→                      </div>
+   286→
+   287→                      <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
+   288→                        <Field label="Sector" value={c.sector.name} />
+   289→                        <Field label="City" value={c.city.name} />
+   290→                        <Field label="Founders" value={String(c.founders.length)} />
+   291→                        <Field label="Annual records" value={String(c._count.annualData)} />
+   292→                      </div>
+   293→
+   294→                      {/* New fields row */}
+   295→                      {(c.foundedYear || c.sinceDate || c.branchesCount || c.revenue != null || c.revenueMin != null) && (
+   296→                        <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
+   297→                          {c.foundedYear && <Field label="Founded" value={String(c.foundedYear)} />}
+   298→                          {c.sinceDate && <Field label="Since" value={c.sinceDate} />}
+   299→                          {c.branchesCount != null && <Field label="Branches" value={String(c.branchesCount)} />}
+   300→                          {c.revenue != null ? (
+   301→                            <Field label="Revenue" value={formatCurrency(c.revenue)} />
+   302→                          ) : c.revenueMin != null || c.revenueMax != null ? (
+   303→                            <Field label="Revenue range" value={`${formatCurrency(c.revenueMin || 0)} – ${formatCurrency(c.revenueMax || 0)}`} />
+   304→                          ) : null}
+   305→                        </div>
+   306→                      )}
+   307→
+   308→                      {c.statusReason && (
+   309→                        <p className="mt-2 text-xs text-muted-foreground">Status reason: {c.statusReason}</p>
+   310→                      )}
+   311→                      {c.discontinuedDate && (
+   312→                        <p className="mt-1 text-xs text-rose-600">Discontinued: {c.discontinuedDate}</p>
+   313→                      )}
+   314→
+   315→                      {c.founders.length > 0 && (
+   316→                        <div className="mt-3 flex flex-wrap gap-1.5">
+   317→                          {c.founders.map((cf) => (
+   318→                            <Badge key={cf.id} variant="outline" className="text-xs">
+   319→                              {cf.founder.firstName} {cf.founder.lastName} · <span className="text-muted-foreground">{cf.role}</span>
+   320→                            </Badge>
+   321→                          ))}
+   322→                        </div>
+   323→                      )}
+   324→
+   325→                      {/* Custom columns inline */}
+   326→                      {customColumns.length > 0 && (
+   327→                        <div className="mt-3">
+   328→                          <button
+   329→                            className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
+   330→                            onClick={() => setShowCustom((s) => ({ ...s, [c.id]: !s[c.id] }))}
+   331→                          >
+   332→                            <Columns3 className="h-3.5 w-3.5" />
+   333→                            Custom fields ({customColumns.length})
+   334→                            {showCust ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+   335→                          </button>
+   336→                          {showCust && (
+   337→                            <div className="mt-2 grid grid-cols-2 sm:grid-cols-3 gap-2">
+   338→                              {customColumns.map((col) => (
+   339→                                <div key={col.id} className="text-sm">
+   340→                                  <span className="text-xs text-muted-foreground">{col.name}</span>
+   341→                                  <div className="font-medium truncate">{getCustomValue(c, col.id) || <span className="text-muted-foreground italic">—</span>}</div>
+   342→                                </div>
+   343→                              ))}
+   344→                            </div>
+   345→                          )}
+   346→                        </div>
+   347→                      )}
+   348→                    </div>
+   349→
+   350→                    {/* Right: API key + actions */}
+   351→                    <div className="lg:w-80 lg:border-l lg:pl-5 space-y-2">
+   352→                      <div>
+   353→                        <Label className="text-xs text-muted-foreground">API Key</Label>
+   354→                        <div className="flex items-center gap-1 mt-1">
+   355→                          <code className="text-xs font-mono bg-muted px-2 py-1 rounded flex-1 truncate">
+   356→                            {revealed ? c.apiKey : `${c.apiKey.slice(0, 14)}••••••••`}
+   357→                          </code>
+   358→                          <Tooltip>
+   359→                            <TooltipTrigger asChild>
+   360→                              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setRevealedKeys((s) => ({ ...s, [c.id]: !s[c.id] }))}>
+   361→                                {revealed ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+   362→                              </Button>
+   363→                            </TooltipTrigger>
+   364→                            <TooltipContent>{revealed ? 'Hide key' : 'Reveal key'}</TooltipContent>
+   365→                          </Tooltip>
+   366→                          <Tooltip>
+   367→                            <TooltipTrigger asChild>
+   368→                              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => copyKey(c.apiKey)}>
+   369→                                <Copy className="h-3.5 w-3.5" />
+   370→                              </Button>
+   371→                            </TooltipTrigger>
+   372→                            <TooltipContent>Copy to clipboard</TooltipContent>
+   373→                          </Tooltip>
+   374→                          <Tooltip>
+   375→                            <TooltipTrigger asChild>
+   376→                              <Button variant="ghost" size="icon" className="h-7 w-7 text-amber-600 hover:text-amber-700 hover:bg-amber-50" onClick={() => regenerateKey(c)}>
+   377→                                <RotateCw className="h-3.5 w-3.5" />
+   378→                              </Button>
+   379→                            </TooltipTrigger>
+   380→                            <TooltipContent>Regenerate key</TooltipContent>
+   381→                          </Tooltip>
+   382→                        </div>
+   383→                      </div>
+   384→                      <div className="flex gap-2">
+   385→                        <Button variant="outline" size="sm" className="flex-1" onClick={() => setEditing(c)}>
+   386→                          <Pencil className="h-3.5 w-3.5 mr-1" /> Edit
+   387→                        </Button>
+   388→                        <Button variant="outline" size="sm" className="text-destructive hover:bg-destructive/5" onClick={() => setDeleting(c)}>
+   389→                          <Trash2 className="h-3.5 w-3.5" />
+   390→                        </Button>
+   391→                      </div>
+   392→                    </div>
+   393→                  </div>
+   394→                </CardContent>
+   395→              </Card>
+   396→            )
+   397→          })}
+   398→          {filteredItems.length === 0 && (
+   399→            <div className="py-16 text-center text-muted-foreground">
+   400→              <Building2 className="h-8 w-8 mx-auto mb-3 opacity-50" />
+   401→              {statusFilter !== 'All' ? `No companies with status "${statusFilter}".` : 'No companies yet. Add one or let companies self-register.'}
+   402→            </div>
+   403→          )}
+   404→        </div>
+   405→      ) : (
+   406→        /* Table View */
+   407→        <Card>
+   408→          <CardContent className="p-0">
+   409→            <Table>
+   410→              <TableHeader>
+   411→                <TableRow>
+   412→                  <TableHead className="pl-4">Name</TableHead>
+   413→                  <TableHead>Sector</TableHead>
+   414→                  <TableHead className="hidden md:table-cell">City</TableHead>
+   415→                  <TableHead>Status</TableHead>
+   416→                  <TableHead className="hidden lg:table-cell">Founded</TableHead>
+   417→                  <TableHead className="hidden lg:table-cell">Revenue</TableHead>
+   418→                  <TableHead>API Key</TableHead>
+   419→                  <TableHead className="text-right pr-4">Actions</TableHead>
+   420→                </TableRow>
+   421→              </TableHeader>
+   422→              <TableBody>
+   423→                {filteredItems.map((c) => {
+   424→                  const revealed = revealedKeys[c.id]
+   425→                  return (
+   426→                    <TableRow key={c.id}>
+   427→                      <TableCell className="pl-4 font-medium max-w-[200px] truncate">
+   428→                        <div className="truncate">{c.name}</div>
+   429→                        {c.email && <div className="text-xs text-muted-foreground truncate">{c.email}</div>}
+   430→                      </TableCell>
+   431→                      <TableCell className="text-muted-foreground">{c.sector.name}</TableCell>
+   432→                      <TableCell className="hidden md:table-cell text-muted-foreground">{c.city.name}</TableCell>
+   433→                      <TableCell>
+   434→                        {c.status ? (
+   435→                          <Badge variant="outline" className={`text-xs ${STATUS_STYLES[c.status] || ''}`}>{c.status}</Badge>
+   436→                        ) : c.apiKeyActive ? (
+   437→                          <Badge variant="secondary" className="text-xs text-emerald-600 bg-emerald-50 border-emerald-200">Active</Badge>
+   438→                        ) : (
+   439→                          <Badge variant="destructive" className="text-xs bg-rose-50 text-rose-700 border-rose-200">Revoked</Badge>
+   440→                        )}
+   441→                      </TableCell>
+   442→                      <TableCell className="hidden lg:table-cell text-muted-foreground">
+   443→                        {c.foundedYear || '—'}
+   444→                      </TableCell>
+   445→                      <TableCell className="hidden lg:table-cell text-muted-foreground">
+   446→                        {c.revenue != null ? formatCurrency(c.revenue) : '—'}
+   447→                      </TableCell>
+   448→                      <TableCell>
+   449→                        <div className="flex items-center gap-0.5">
+   450→                          <code className="text-xs font-mono bg-muted px-1.5 py-0.5 rounded max-w-[120px] truncate">
+   451→                            {revealed ? c.apiKey : `${c.apiKey.slice(0, 10)}•••`}
+   452→                          </code>
+   453→                          <Tooltip>
+   454→                            <TooltipTrigger asChild>
+   455→                              <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setRevealedKeys((s) => ({ ...s, [c.id]: !s[c.id] }))}>
+   456→                                {revealed ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
+   457→                              </Button>
+   458→                            </TooltipTrigger>
+   459→                            <TooltipContent>{revealed ? 'Hide' : 'Reveal'}</TooltipContent>
+   460→                          </Tooltip>
+   461→                          <Tooltip>
+   462→                            <TooltipTrigger asChild>
+   463→                              <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => copyKey(c.apiKey)}>
+   464→                                <Copy className="h-3 w-3" />
+   465→                              </Button>
+   466→                            </TooltipTrigger>
+   467→                            <TooltipContent>Copy</TooltipContent>
+   468→                          </Tooltip>
+   469→                          <Tooltip>
+   470→                            <TooltipTrigger asChild>
+   471→                              <Button variant="ghost" size="icon" className="h-6 w-6 text-amber-600 hover:text-amber-700" onClick={() => regenerateKey(c)}>
+   472→                                <RotateCw className="h-3 w-3" />
+   473→                              </Button>
+   474→                            </TooltipTrigger>
+   475→                            <TooltipContent>Regenerate</TooltipContent>
+   476→                          </Tooltip>
+   477→                        </div>
+   478→                      </TableCell>
+   479→                      <TableCell className="text-right pr-4">
+   480→                        <div className="flex items-center justify-end gap-1">
+   481→                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setEditing(c)}>
+   482→                            <Pencil className="h-3.5 w-3.5" />
+   483→                          </Button>
+   484→                          <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => setDeleting(c)}>
+   485→                            <Trash2 className="h-3.5 w-3.5" />
+   486→                          </Button>
+   487→                        </div>
+   488→                      </TableCell>
+   489→                    </TableRow>
+   490→                  )
+   491→                })}
+   492→              </TableBody>
+   493→            </Table>
+   494→            {filteredItems.length === 0 && (
+   495→              <div className="py-16 text-center text-muted-foreground">
+   496→                <Building2 className="h-8 w-8 mx-auto mb-3 opacity-50" />
+   497→                {statusFilter !== 'All' ? `No companies with status "${statusFilter}".` : 'No companies yet.'}
+   498→              </div>
+   499→            )}
+   500→          </CardContent>
+   501→        </Card>
+   502→      )}
+   503→
+   504→      {/* Create dialog */}
+   505→      <CompanyFormDialog
+   506→        open={creating}
+   507→        onOpenChange={setCreating}
+   508→        lookup={lookup}
+   509→        customColumns={customColumns}
+   510→        onSaved={() => { setCreating(false); load() }}
+   511→      />
+   512→      {/* Edit dialog */}
+   513→      <CompanyFormDialog
+   514→        open={!!editing}
+   515→        onOpenChange={(o) => !o && setEditing(null)}
+   516→        company={editing}
+   517→        lookup={lookup}
+   518→        customColumns={customColumns}
+   519→        onSaved={() => { setEditing(null); load() }}
+   520→      />
+   521→      {/* Delete confirm */}
+   522→      <AlertDialog open={!!deleting} onOpenChange={(o) => !o && setDeleting(null)}>
+   523→        <AlertDialogContent>
+   524→          <AlertDialogHeader>
+   525→            <AlertDialogTitle>Delete company "{deleting?.name}"?</AlertDialogTitle>
+   526→            <AlertDialogDescription>
+   527→              This permanently removes the company, its founder attachments and all annual data. This cannot be undone.
+   528→            </AlertDialogDescription>
+   529→          </AlertDialogHeader>
+   530→          <AlertDialogFooter>
+   531→            <AlertDialogCancel>Cancel</AlertDialogCancel>
+   532→            <AlertDialogAction
+   533→              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+   534→              onClick={async () => {
+   535→                try {
+   536→                  await api(`/api/admin/companies/${deleting!.id}`, { method: 'DELETE' })
+   537→                  toast({ title: 'Deleted', description: `${deleting!.name} removed` })
+   538→                  setDeleting(null)
+   539→                  load()
+   540→                } catch (e: any) {
+   541→                  toast({ title: 'Error', description: e.message, variant: 'destructive' })
+   542→                }
+   543→              }}
+   544→            >
+   545→              Delete
+   546→            </AlertDialogAction>
+   547→          </AlertDialogFooter>
+   548→        </AlertDialogContent>
+   549→      </AlertDialog>
+   550→    </div>
+   551→  )
+   552→}
+   553→
+   554→function Field({ label, value }: { label: string; value: React.ReactNode }) {
+   555→  return (
+   556→    <div>
+   557→      <div className="text-xs text-muted-foreground">{label}</div>
+   558→      <div className="font-medium truncate">{value}</div>
+   559→    </div>
+   560→  )
+   561→}
+   562→
+   563→function CompanyFormDialog({
+   564→  open,
+   565→  onOpenChange,
+   566→  company,
+   567→  lookup,
+   568→  customColumns,
+   569→  onSaved,
+   570→}: {
+   571→  open: boolean
+   572→  onOpenChange: (o: boolean) => void
+   573→  company?: Company | null
+   574→  lookup: Lookup | null
+   575→  customColumns: CustomColumn[]
+   576→  onSaved: () => void
+   577→}) {
+   578→  const [name, setName] = useState('')
+   579→  const [description, setDescription] = useState('')
+   580→  const [email, setEmail] = useState('')
+   581→  const [phone, setPhone] = useState('')
+   582→  const [website, setWebsite] = useState('')
+   583→  const [sectorId, setSectorId] = useState('')
+   584→  const [cityId, setCityId] = useState('')
+   585→  const [locationId, setLocationId] = useState('')
+   586→  const [founderIds, setFounderIds] = useState<string[]>([])
+   587→  const [apiKeyActive, setApiKeyActive] = useState(true)
+   588→  const [regenerateKey, setRegenerateKey] = useState(false)
+   589→  // New fields
+   590→  const [status, setStatus] = useState('')
+   591→  const [statusReason, setStatusReason] = useState('')
+   592→  const [sinceDate, setSinceDate] = useState('')
+   593→  const [foundedYear, setFoundedYear] = useState('')
+   594→  const [discontinuedDate, setDiscontinuedDate] = useState('')
+   595→  const [branchesCount, setBranchesCount] = useState('')
+   596→  const [revenue, setRevenue] = useState('')
+   597→  const [revenueMin, setRevenueMin] = useState('')
+   598→  const [revenueMax, setRevenueMax] = useState('')
+   599→  // Custom column values
+   600→  const [customValues, setCustomValues] = useState<Record<string, string>>({})
+   601→  const [saving, setSaving] = useState(false)
+   602→  const { toast } = useToast()
+   603→
+   604→  useEffect(() => {
+   605→    if (open) {
+   606→      setName(company?.name || '')
+   607→      setDescription(company?.description || '')
+   608→      setEmail(company?.email || '')
+   609→      setPhone(company?.phone || '')
+   610→      setWebsite(company?.website || '')
+   611→      setSectorId(company?.sectorId || '')
+   612→      setCityId(company?.cityId || '')
+   613→      setLocationId(company?.locationId || '')
+   614→      setFounderIds(company?.founders.map((f) => f.founder.id) || [])
+   615→      setApiKeyActive(company?.apiKeyActive ?? true)
+   616→      setRegenerateKey(false)
+   617→      // New fields
+   618→      setStatus(company?.status || '')
+   619→      setStatusReason(company?.statusReason || '')
+   620→      setSinceDate(company?.sinceDate || '')
+   621→      setFoundedYear(company?.foundedYear ? String(company.foundedYear) : '')
+   622→      setDiscontinuedDate(company?.discontinuedDate || '')
+   623→      setBranchesCount(company?.branchesCount != null ? String(company.branchesCount) : '')
+   624→      setRevenue(company?.revenue != null ? String(company.revenue) : '')
+   625→      setRevenueMin(company?.revenueMin != null ? String(company.revenueMin) : '')
+   626→      setRevenueMax(company?.revenueMax != null ? String(company.revenueMax) : '')
+   627→      // Custom values
+   628→      const cvMap: Record<string, string> = {}
+   629→      company?.customValues?.forEach((cv) => { cvMap[cv.customColumnId] = cv.value })
+   630→      setCustomValues(cvMap)
+   631→    }
+   632→  }, [open, company])
+   633→
+   634→  const submit = async (e: React.FormEvent) => {
+   635→    e.preventDefault()
+   636→    if (!name || !sectorId || !cityId) {
+   637→      toast({ title: 'Validation', description: 'Name, sector and city are required', variant: 'destructive' })
+   638→      return
+   639→    }
+   640→    // Validate required custom columns
+   641→    for (const col of customColumns) {
+   642→      if (col.required && !customValues[col.id]?.trim()) {
+   643→        toast({ title: 'Validation', description: `"${col.name}" is required`, variant: 'destructive' })
+   644→        return
+   645→      }
+   646→    }
+   647→    setSaving(true)
+   648→    try {
+   649→      const body: Record<string, unknown> = {
+   650→        name, description, email, phone, website,
+   651→        sectorId, cityId, locationId: locationId || null,
+   652→        founderIds, apiKeyActive, regenerateKey,
+   653→        // New fields
+   654→        status: status || null,
+   655→        statusReason: statusReason || null,
+   656→        sinceDate: sinceDate || null,
+   657→        foundedYear: foundedYear ? Number(foundedYear) : null,
+   658→        discontinuedDate: discontinuedDate || null,
+   659→        branchesCount: branchesCount ? Number(branchesCount) : null,
+   660→        revenue: revenue ? Number(revenue) : null,
+   661→        revenueMin: revenueMin ? Number(revenueMin) : null,
+   662→        revenueMax: revenueMax ? Number(revenueMax) : null,
+   663→      }
+   664→      // Add custom values as a separate key
+   665→      const cvPayload = customColumns.map((col) => ({
+   666→        customColumnId: col.id,
+   667→        value: customValues[col.id] || '',
+   668→      }))
+   669→      if (cvPayload.length > 0) {
+   670→        body.customValues = cvPayload
+   671→      }
+   672→
+   673→      if (company) {
+   674→        await api(`/api/admin/companies/${company.id}`, { method: 'PUT', body })
+   675→        toast({ title: 'Saved', description: 'Company updated' })
+   676→      } else {
+   677→        await api('/api/admin/companies', { method: 'POST', body })
+   678→        toast({ title: 'Created', description: 'Company added' })
+   679→      }
+   680→      onSaved()
+   681→    } catch (e: any) {
+   682→      toast({ title: 'Error', description: e.message, variant: 'destructive' })
+   683→    } finally {
+   684→      setSaving(false)
+   685→    }
+   686→  }
+   687→
+   688→  return (
+   689→    <Dialog open={open} onOpenChange={onOpenChange}>
+   690→      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+   691→        <DialogHeader>
+   692→          <DialogTitle>{company ? 'Edit company' : 'New company'}</DialogTitle>
+   693→          <DialogDescription>
+   694→            {company ? 'Update the company profile and manage its API key.' : 'Add a new company to the registry. A unique API key is generated automatically.'}
+   695→          </DialogDescription>
+   696→        </DialogHeader>
+   697→        <form onSubmit={submit} className="space-y-4">
+   698→          {/* Basic info */}
+   699→          <div className="grid sm:grid-cols-2 gap-3">
+   700→            <div className="space-y-1.5 sm:col-span-2">
+   701→              <Label>Company name *</Label>
+   702→              <Input value={name} onChange={(e) => setName(e.target.value)} required />
+   703→            </div>
+   704→            <div className="space-y-1.5 sm:col-span-2">
+   705→              <Label>Description</Label>
+   706→              <Textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={2} />
+   707→            </div>
+   708→            <div className="space-y-1.5">
+   709→              <Label>Email</Label>
+   710→              <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+   711→            </div>
+   712→            <div className="space-y-1.5">
+   713→              <Label>Phone</Label>
+   714→              <Input value={phone} onChange={(e) => setPhone(e.target.value)} />
+   715→            </div>
+   716→            <div className="space-y-1.5 sm:col-span-2">
+   717→              <Label>Website</Label>
+   718→              <Input value={website} onChange={(e) => setWebsite(e.target.value)} placeholder="https://…" />
+   719→            </div>
+   720→          </div>
+   721→
+   722→          {/* Status & Lifecycle */}
+   723→          <div className="border-t pt-4">
+   724→            <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">Status & Lifecycle</div>
+   725→            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+   726→              <div className="space-y-1.5">
+   727→                <Label>Status</Label>
+   728→                <Select value={status} onValueChange={setStatus}>
+   729→                  <SelectTrigger><SelectValue placeholder="Not set" /></SelectTrigger>
+   730→                  <SelectContent>
+   731→                    <SelectItem value="">Not set</SelectItem>
+   732→                    <SelectItem value="Active">Active</SelectItem>
+   733→                    <SelectItem value="Inactive">Inactive</SelectItem>
+   734→                    <SelectItem value="Discontinued">Discontinued</SelectItem>
+   735→                  </SelectContent>
+   736→                </Select>
+   737→              </div>
+   738→              <div className="space-y-1.5">
+   739→                <Label>Status reason</Label>
+   740→                <Input value={statusReason} onChange={(e) => setStatusReason(e.target.value)} placeholder="Optional reason" />
+   741→              </div>
+   742→              <div className="space-y-1.5">
+   743→                <Label>Founded year</Label>
+   744→                <Input type="number" value={foundedYear} onChange={(e) => setFoundedYear(e.target.value)} placeholder="e.g. 2018" min="1950" max="2100" />
+   745→              </div>
+   746→              <div className="space-y-1.5">
+   747→                <Label>Since date</Label>
+   748→                <Input type="date" value={sinceDate} onChange={(e) => setSinceDate(e.target.value)} />
+   749→              </div>
+   750→              <div className="space-y-1.5">
+   751→                <Label>Discontinued date</Label>
+   752→                <Input type="date" value={discontinuedDate} onChange={(e) => setDiscontinuedDate(e.target.value)} />
+   753→              </div>
+   754→              <div className="space-y-1.5">
+   755→                <Label>Branches count</Label>
+   756→                <Input type="number" value={branchesCount} onChange={(e) => setBranchesCount(e.target.value)} placeholder="0" min="0" />
+   757→              </div>
+   758→            </div>
+   759→          </div>
+   760→
+   761→          {/* Revenue */}
+   762→          <div className="border-t pt-4">
+   763→            <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">Revenue (PKR)</div>
+   764→            <div className="grid sm:grid-cols-3 gap-3">
+   765→              <div className="space-y-1.5">
+   766→                <Label>Exact revenue</Label>
+   767→                <Input type="number" value={revenue} onChange={(e) => setRevenue(e.target.value)} placeholder="Leave blank if using range" />
+   768→              </div>
+   769→              <div className="space-y-1.5">
+   770→                <Label>Revenue min</Label>
+   771→                <Input type="number" value={revenueMin} onChange={(e) => setRevenueMin(e.target.value)} placeholder="Min" />
+   772→              </div>
+   773→              <div className="space-y-1.5">
+   774→                <Label>Revenue max</Label>
+   775→                <Input type="number" value={revenueMax} onChange={(e) => setRevenueMax(e.target.value)} placeholder="Max" />
+   776→              </div>
+   777→            </div>
+   778→          </div>
+   779→
+   780→          {/* Classification */}
+   781→          <div className="border-t pt-4">
+   782→            <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">Classification</div>
+   783→            <div className="grid sm:grid-cols-2 gap-3">
+   784→              <div className="space-y-1.5">
+   785→                <Label>Sector *</Label>
+   786→                <Select value={sectorId} onValueChange={setSectorId}>
+   787→                  <SelectTrigger><SelectValue placeholder="Select sector" /></SelectTrigger>
+   788→                  <SelectContent>
+   789→                    {lookup?.sectors.map((s) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
+   790→                  </SelectContent>
+   791→                </Select>
+   792→              </div>
+   793→              <div className="space-y-1.5">
+   794→                <Label>City *</Label>
+   795→                <Select value={cityId} onValueChange={setCityId}>
+   796→                  <SelectTrigger><SelectValue placeholder="Select city" /></SelectTrigger>
+   797→                  <SelectContent>
+   798→                    {lookup?.cities.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+   799→                  </SelectContent>
+   800→                </Select>
+   801→              </div>
+   802→              <div className="space-y-1.5 sm:col-span-2">
+   803→                <Label>Location</Label>
+   804→                <Select value={locationId} onValueChange={setLocationId}>
+   805→                  <SelectTrigger><SelectValue placeholder="Optional" /></SelectTrigger>
+   806→                  <SelectContent>
+   807→                    {lookup?.locations.map((l) => <SelectItem key={l.id} value={l.id}>{l.address} · {l.city.name}</SelectItem>)}
+   808→                  </SelectContent>
+   809→                </Select>
+   810→              </div>
+   811→            </div>
+   812→          </div>
+   813→
+   814→          {/* Founders */}
+   815→          <div className="border-t pt-4">
+   816→            <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">Founders</div>
+   817→            <div className="border rounded-md p-3 max-h-40 overflow-y-auto space-y-2">
+   818→              {lookup?.founders.length === 0 && <div className="text-xs text-muted-foreground">No founders registered yet.</div>}
+   819→              {lookup?.founders.map((f) => (
+   820→                <label key={f.id} className="flex items-center gap-2 text-sm cursor-pointer">
+   821→                  <input
+   822→                    type="checkbox"
+   823→                    checked={founderIds.includes(f.id)}
+   824→                    onChange={(e) => setFounderIds((s) => e.target.checked ? [...s, f.id] : s.filter((x) => x !== f.id))}
+   825→                    className="accent-primary"
+   826→                  />
+   827→                  <span>{f.firstName} {f.lastName}</span>
+   828→                  <Badge variant="outline" className="text-xs ml-auto">{f.gender}</Badge>
+   829→                </label>
+   830→              ))}
+   831→            </div>
+   832→          </div>
+   833→
+   834→          {/* Custom columns */}
+   835→          {customColumns.length > 0 && (
+   836→            <div className="border-t pt-4">
+   837→              <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3 flex items-center gap-1.5">
+   838→                <Columns3 className="h-3.5 w-3.5" /> Custom Fields
+   839→              </div>
+   840→              <div className="grid sm:grid-cols-2 gap-3">
+   841→                {customColumns.map((col) => (
+   842→                  <div key={col.id} className="space-y-1.5">
+   843→                    <Label>{col.name}{col.required && <span className="text-destructive ml-1">*</span>}{col.description && <span className="text-xs text-muted-foreground ml-1.5">— {col.description}</span>}</Label>
+   844→                    {col.columnType === 'number' ? (
+   845→                      <Input
+   846→                        type="number"
+   847→                        value={customValues[col.id] || ''}
+   848→                        onChange={(e) => setCustomValues((s) => ({ ...s, [col.id]: e.target.value }))}
+   849→                        placeholder={col.required ? 'Required' : 'Optional'}
+   850→                      />
+   851→                    ) : col.columnType === 'date' ? (
+   852→                      <Input
+   853→                        type="date"
+   854→                        value={customValues[col.id] || ''}
+   855→                        onChange={(e) => setCustomValues((s) => ({ ...s, [col.id]: e.target.value }))}
+   856→                      />
+   857→                    ) : col.columnType === 'boolean' ? (
+   858→                      <label className="flex items-center gap-2 h-9 cursor-pointer">
+   859→                        <input
+   860→                          type="checkbox"
+   861→                          checked={customValues[col.id] === 'true' || customValues[col.id] === '1'}
+   862→                          onChange={(e) => setCustomValues((s) => ({ ...s, [col.id]: e.target.checked ? 'true' : 'false' }))}
+   863→                          className="accent-primary"
+   864→                        />
+   865→                        <span className="text-sm">{customValues[col.id] === 'true' ? 'Yes' : 'No'}</span>
+   866→                      </label>
+   867→                    ) : col.columnType === 'url' ? (
+   868→                      <Input
+   869→                        type="url"
+   870→                        value={customValues[col.id] || ''}
+   871→                        onChange={(e) => setCustomValues((s) => ({ ...s, [col.id]: e.target.value }))}
+   872→                        placeholder="https://…"
+   873→                      />
+   874→                    ) : (
+   875→                      <Input
+   876→                        value={customValues[col.id] || ''}
+   877→                        onChange={(e) => setCustomValues((s) => ({ ...s, [col.id]: e.target.value }))}
+   878→                        placeholder={col.required ? 'Required' : 'Optional'}
+   879→                      />
+   880→                    )}
+   881→                  </div>
+   882→                ))}
+   883→              </div>
+   884→            </div>
+   885→          )}
+   886→
+   887→          {/* API key management (edit only) */}
+   888→          {company && (
+   889→            <div className="border-t pt-3 space-y-3">
+   890→              <label className="flex items-center gap-2 text-sm cursor-pointer">
+   891→                <input type="checkbox" checked={apiKeyActive} onChange={(e) => setApiKeyActive(e.target.checked)} className="accent-primary" />
+   892→                <span>API key active (companies can sign in with this key)</span>
+   893→              </label>
+   894→              <label className="flex items-center gap-2 text-sm cursor-pointer">
+   895→                <input type="checkbox" checked={regenerateKey} onChange={(e) => setRegenerateKey(e.target.checked)} className="accent-primary" />
+   896→                <span className="flex items-center gap-1"><KeyRound className="h-3.5 w-3.5" /> Regenerate API key (invalidates the old one)</span>
+   897→              </label>
+   898→              {regenerateKey && (
+   899→                <p className="text-xs text-amber-600">The previous key stops working immediately. You'll need to share the new one with the company.</p>
+   900→              )}
+   901→            </div>
+   902→          )}
+   903→
+   904→          <DialogFooter>
+   905→            <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
+   906→            <Button type="submit" disabled={saving}>
+   907→              {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+   908→              {company ? 'Save changes' : 'Create company'}
+   909→            </Button>
+   910→          </DialogFooter>
+   911→        </form>
+   912→      </DialogContent>
+   913→    </Dialog>
+   914→  )
+   915→}
+   916→
