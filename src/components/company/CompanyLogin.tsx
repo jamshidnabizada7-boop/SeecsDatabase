@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { api } from '@/lib/client-utils'
-import { Loader2, KeyRound, ArrowLeft, UserPlus } from 'lucide-react'
+import { Loader2, KeyRound, ArrowLeft, UserPlus, CheckCircle2, AlertTriangle } from 'lucide-react'
 
 interface Lookup {
   sectors: { id: string; name: string }[]
@@ -77,18 +77,23 @@ export default function CompanyLogin({ onLoggedIn, onExit }: { onLoggedIn: (c: a
     }
   }
 
-  // Success screen after registration
+  // Success screen after registration — green check animation
   if (success) {
     return (
       <div className="min-h-screen grid place-items-center bg-gradient-to-b from-background to-muted/40 px-4">
         <Card className="w-full max-w-md">
           <CardHeader className="text-center">
-            <div className="mx-auto h-12 w-12 rounded-xl bg-emerald-500 text-white grid place-items-center mb-3">
-              <KeyRound className="h-6 w-6" />
+            <div className="mx-auto mb-4 flex justify-center">
+              <div className="relative h-16 w-16">
+                <div className="absolute inset-0 rounded-full bg-emerald-100 animate-ping opacity-20" />
+                <div className="relative h-16 w-16 rounded-full bg-gradient-to-br from-emerald-400 to-emerald-600 text-white grid place-items-center shadow-lg animate-[checkBounce_0.5s_ease-out]">
+                  <CheckCircle2 className="h-8 w-8" />
+                </div>
+              </div>
             </div>
-            <CardTitle>Registration successful!</CardTitle>
-            <CardDescription>
-              <strong>{success.name}</strong> has been registered. Save this API key — you'll need it to sign in to the company portal.
+            <CardTitle className="text-xl">Registration successful!</CardTitle>
+            <CardDescription className="mt-2">
+              <strong>{success.name}</strong> has been registered. Save this API key — you&apos;ll need it to sign in to the company portal.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -105,9 +110,10 @@ export default function CompanyLogin({ onLoggedIn, onExit }: { onLoggedIn: (c: a
                 </Button>
               </div>
             </div>
-            <Alert>
-              <AlertDescription>
-                ⚠️ Treat this key like a password. Anyone with it can sign in as your company. The SEECS admin can revoke or regenerate it if needed.
+            <Alert className="border-amber-200 bg-amber-50">
+              <AlertTriangle className="h-4 w-4 text-amber-600" />
+              <AlertDescription className="text-amber-800">
+                Treat this key like a password. Anyone with it can sign in as your company. The SEECS admin can revoke or regenerate it if needed.
               </AlertDescription>
             </Alert>
             <Button
@@ -118,6 +124,13 @@ export default function CompanyLogin({ onLoggedIn, onExit }: { onLoggedIn: (c: a
             </Button>
           </CardContent>
         </Card>
+        <style>{`
+          @keyframes checkBounce {
+            0% { transform: scale(0.3); opacity: 0; }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); opacity: 1; }
+          }
+        `}</style>
       </div>
     )
   }
@@ -126,7 +139,7 @@ export default function CompanyLogin({ onLoggedIn, onExit }: { onLoggedIn: (c: a
     <div className="min-h-screen flex flex-col bg-gradient-to-b from-background to-muted/30">
       <header className="border-b bg-background/80 backdrop-blur sticky top-0 z-10">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
-          <button onClick={onExit} className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
+          <button onClick={onExit} className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors">
             <ArrowLeft className="h-4 w-4" /> Back to home
           </button>
           <div className="flex items-center gap-2">
@@ -142,24 +155,31 @@ export default function CompanyLogin({ onLoggedIn, onExit }: { onLoggedIn: (c: a
 
       <main className="flex-1 grid place-items-center px-4 py-10">
         {mode === 'login' ? (
-          <Card className="w-full max-w-md">
-            <CardHeader>
+          <Card className="w-full max-w-md shadow-lg">
+            <CardHeader className="text-center pb-2">
+              <div className="mx-auto h-12 w-12 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white grid place-items-center mb-3 shadow-md">
+                <KeyRound className="h-6 w-6" />
+              </div>
               <CardTitle>Company portal</CardTitle>
-              <CardDescription>Enter your company's API key to manage your profile.</CardDescription>
+              <CardDescription>Enter your company&apos;s API key to manage your profile.</CardDescription>
             </CardHeader>
             <CardContent>
               <form onSubmit={submitLogin} className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="apiKey">API Key</Label>
-                  <Input
-                    id="apiKey"
-                    type="password"
-                    value={apiKey}
-                    onChange={(e) => setApiKey(e.target.value)}
-                    placeholder="sk_seecs_…"
-                    autoComplete="off"
-                    required
-                  />
+                  <div className="relative">
+                    <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      id="apiKey"
+                      type="password"
+                      value={apiKey}
+                      onChange={(e) => setApiKey(e.target.value)}
+                      placeholder="sk_seecs_xxxxxxxxxxxxxxxxxxxx"
+                      autoComplete="off"
+                      required
+                      className="pl-9"
+                    />
+                  </div>
                 </div>
                 {error && (
                   <Alert variant="destructive">
@@ -171,8 +191,13 @@ export default function CompanyLogin({ onLoggedIn, onExit }: { onLoggedIn: (c: a
                   Sign in
                 </Button>
                 <p className="text-xs text-muted-foreground text-center pt-2 border-t">
-                  Don't have a key yet?{' '}
-                  <button type="button" className="text-foreground underline" onClick={() => { setMode('register'); setError(''); loadLookup() }}>
+                  Don&apos;t have a key yet?{' '}
+                  <button
+                    type="button"
+                    className="inline-flex items-center gap-1 text-emerald-600 hover:text-emerald-700 font-medium underline underline-offset-2 transition-colors"
+                    onClick={() => { setMode('register'); setError(''); loadLookup() }}
+                  >
+                    <UserPlus className="h-3 w-3" />
                     Register your company
                   </button>
                 </p>
@@ -180,12 +205,12 @@ export default function CompanyLogin({ onLoggedIn, onExit }: { onLoggedIn: (c: a
             </CardContent>
           </Card>
         ) : (
-          <Card className="w-full max-w-2xl">
+          <Card className="w-full max-w-2xl shadow-lg">
             <CardHeader>
               <CardTitle>Register your company</CardTitle>
               <CardDescription>
                 Fill in your company details. A unique API key will be generated for you to manage your own data.
-                You will not be able to see or edit any other company's data.
+                You will not be able to see or edit any other company&apos;s data.
               </CardDescription>
             </CardHeader>
             <CardContent>

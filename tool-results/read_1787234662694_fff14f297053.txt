@@ -1,0 +1,865 @@
+     1→     1→'use client'
+     2→     2→
+     3→     3→import { useCallback, useEffect, useState } from 'react'
+     4→     4→import { api, formatCurrency, formatDate } from '@/lib/client-utils'
+     5→     5→import { Button } from '@/components/ui/button'
+     6→     6→import { Input } from '@/components/ui/input'
+     7→     7→import { Label } from '@/components/ui/label'
+     8→     8→import { Textarea } from '@/components/ui/textarea'
+     9→     9→import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+    10→    10→import { Badge } from '@/components/ui/badge'
+    11→    11→import { Alert, AlertDescription } from '@/components/ui/alert'
+    12→    12→import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+    13→    13→import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
+    14→    14→import { useToast } from '@/hooks/use-toast'
+    15→    15→import { Building2, LogOut, Loader2, RefreshCw, Pencil, Trash2, Plus, Users, DollarSign, ShieldCheck, Copy, KeyRound, Columns3, Calendar, MapPin } from 'lucide-react'
+    16→    16→
+    17→    17→interface CustomColumn {
+    18→    18→  id: string
+    19→    19→  name: string
+    20→    20→  slug: string
+    21→    21→  columnType: string
+    22→    22→  targetTable: string
+    23→    23→  description: string | null
+    24→    24→  required: boolean
+    25→    25→  sortOrder: number
+    26→    26→}
+    27→    27→
+    28→    28→interface CustomValue {
+    29→    29→  id: string
+    30→    30→  customColumnId: string
+    31→    31→  value: string
+    32→    32→  customColumn: CustomColumn
+    33→    33→}
+    34→    34→
+    35→    35→interface CompanyFull {
+    36→    36→  id: string
+    37→    37→  name: string
+    38→    38→  description: string | null
+    39→    39→  email: string | null
+    40→    40→  phone: string | null
+    41→    41→  website: string | null
+    42→    42→  sectorId: string
+    43→    43→  cityId: string
+    44→    44→  locationId: string | null
+    45→    45→  apiKey: string
+    46→    46→  apiKeyActive: boolean
+    47→    47→  registeredAt: string
+    48→    48→  // New Java fields
+    49→    49→  status: string | null
+    50→    50→  statusReason: string | null
+    51→    51→  sinceDate: string | null
+    52→    52→  foundedYear: number | null
+    53→    53→  discontinuedDate: string | null
+    54→    54→  branchesCount: number | null
+    55→    55→  revenue: number | null
+    56→    56→  revenueMin: number | null
+    57→    57→  revenueMax: number | null
+    58→    58→  // Relations
+    59→    59→  sector: { id: string; name: string }
+    60→    60→  city: { id: string; name: string }
+    61→    61→  location: { id: string; address: string; country: string; city: { name: string } } | null
+    62→    62→  founders: { id: string; role: string; founder: { id: string; firstName: string; lastName: string; gender: string; email: string | null; phone: string | null; degree: { id: string; name: string } | null } }[]
+    63→    63→  annualData: { id: string; year: number; monthlyRevenue: number; totalRevenue: number; employeeCount: number; projectCount: number; notes: string | null }[]
+    64→    64→  customValues: CustomValue[]
+    65→    65→}
+    66→    66→
+    67→    67→interface Lookup {
+    68→    68→  sectors: { id: string; name: string }[]
+    69→    69→  cities: { id: string; name: string }[]
+    70→    70→  locations: { id: string; address: string; city: { name: string } }[]
+    71→    71→  degrees: { id: string; name: string }[]
+    72→    72→  founders: { id: string; firstName: string; lastName: string; gender: string }[]
+    73→    73→}
+    74→    74→
+    75→    75→type Tab = 'profile' | 'founders' | 'annual'
+    76→    76→
+    77→    77→const STATUS_STYLES: Record<string, string> = {
+    78→    78→  Active: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+    79→    79→  Inactive: 'bg-amber-50 text-amber-700 border-amber-200',
+    80→    80→  Discontinued: 'bg-rose-50 text-rose-700 border-rose-200',
+    81→    81→}
+    82→    82→
+    83→    83→export default function CompanyPortal({ company, onLogout }: { company: any; onLogout: () => void }) {
+    84→    84→  const [tab, setTab] = useState<Tab>('profile')
+    85→    85→  const [data, setData] = useState<CompanyFull | null>(null)
+    86→    86→  const [customColumns, setCustomColumns] = useState<CustomColumn[]>([])
+    87→    87→  const [loading, setLoading] = useState(true)
+    88→    88→  const [revealed, setRevealed] = useState(false)
+    89→    89→  const { toast } = useToast()
+    90→    90→
+    91→    91→  const load = useCallback(async () => {
+    92→    92→    setLoading(true)
+    93→    93→    try {
+    94→    94→      const r = await api<{ company: CompanyFull; customColumns: CustomColumn[] }>('/api/company/self')
+    95→    95→      setData(r.company)
+    96→    96→      setCustomColumns(r.customColumns || [])
+    97→    97→    } catch (e: any) {
+    98→    98→      toast({ title: 'Error', description: e.message, variant: 'destructive' })
+    99→    99→    } finally {
+   100→   100→      setLoading(false)
+   101→   101→    }
+   102→   102→  }, [toast])
+   103→   103→
+   104→   104→  useEffect(() => {
+   105→   105→    load()
+   106→   106→  }, [load])
+   107→   107→
+   108→   108→  return (
+   109→   109→    <div className="min-h-screen flex flex-col bg-muted/20">
+   110→   110→      {/* Header */}
+   111→   111→      <header className="border-b bg-background sticky top-0 z-10">
+   112→   112→        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between">
+   113→   113→          <div className="flex items-center gap-3">
+   114→   114→            <div className="h-9 w-9 rounded-lg bg-primary text-primary-foreground grid place-items-center font-bold">
+   115→   115→              {company.name.charAt(0).toUpperCase()}
+   116→   116→            </div>
+   117→   117→            <div className="leading-tight">
+   118→   118→              <div className="font-semibold text-sm truncate max-w-[200px] sm:max-w-xs">{company.name}</div>
+   119→   119→              <div className="text-xs text-muted-foreground">Company Portal</div>
+   120→   120→            </div>
+   121→   121→          </div>
+   122→   122→          <div className="flex items-center gap-2">
+   123→   123→            <Button variant="ghost" size="sm" onClick={load} disabled={loading}>
+   124→   124→              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+   125→   125→            </Button>
+   126→   126→            <Button variant="outline" size="sm" onClick={onLogout}>
+   127→   127→              <LogOut className="h-4 w-4 mr-1.5" /> Sign out
+   128→   128→            </Button>
+   129→   129→          </div>
+   130→   130→        </div>
+   131→   131→      </header>
+   132→   132→
+   133→   133→      {/* Isolation banner */}
+   134→   134→      <div className="bg-emerald-50 border-b border-emerald-200">
+   135→   135→        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-2 flex items-center gap-2 text-xs text-emerald-800">
+   136→   136→          <ShieldCheck className="h-3.5 w-3.5 shrink-0" />
+   137→   137→          You are signed in as <strong>{company.name}</strong>. You can only view and edit your own company data.
+   138→   138→        </div>
+   139→   139→      </div>
+   140→   140→
+   141→   141→      {/* Tabs */}
+   142→   142→      <div className="border-b bg-background">
+   143→   143→        <div className="max-w-5xl mx-auto px-4 sm:px-6 flex gap-1 overflow-x-auto">
+   144→   144→          <TabBtn active={tab === 'profile'} onClick={() => setTab('profile')} icon={<Building2 className="h-4 w-4" />}>Profile</TabBtn>
+   145→   145→          <TabBtn active={tab === 'founders'} onClick={() => setTab('founders')} icon={<Users className="h-4 w-4" />}>Founders {data && <span className="ml-1 text-xs text-muted-foreground">({data.founders.length})</span>}</TabBtn>
+   146→   146→          <TabBtn active={tab === 'annual'} onClick={() => setTab('annual')} icon={<DollarSign className="h-4 w-4" />}>Annual Data {data && <span className="ml-1 text-xs text-muted-foreground">({data.annualData.length})</span>}</TabBtn>
+   147→   147→        </div>
+   148→   148→      </div>
+   149→   149→
+   150→   150→      <main className="flex-1 max-w-5xl w-full mx-auto px-4 sm:px-6 py-6">
+   151→   151→        {loading && !data ? (
+   152→   152→          <div className="py-12 text-center text-muted-foreground text-sm"><Loader2 className="h-5 w-5 animate-spin inline mr-2" />Loading your company data…</div>
+   153→   153→        ) : !data ? (
+   154→   154→          <div className="py-12 text-center text-muted-foreground text-sm">Failed to load.</div>
+   155→   155→        ) : (
+   156→   156→          <>
+   157→   157→            {tab === 'profile' && <ProfileTab company={data} customColumns={customColumns} onChanged={load} revealed={revealed} setRevealed={setRevealed} />}
+   158→   158→            {tab === 'founders' && <FoundersTab company={data} onChanged={load} />}
+   159→   159→            {tab === 'annual' && <AnnualTab company={data} onChanged={load} />}
+   160→   160→          </>
+   161→   161→        )}
+   162→   162→      </main>
+   163→   163→
+   164→   164→      <footer className="border-t bg-background mt-auto">
+   165→   165→        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-4 text-center text-xs text-muted-foreground">
+   166→   166→          SEECS Company Registry · NUST Islamabad
+   167→   167→        </div>
+   168→   168→      </footer>
+   169→   169→    </div>
+   170→   170→  )
+   171→   171→}
+   172→   172→
+   173→   173→function TabBtn({ active, onClick, icon, children }: { active: boolean; onClick: () => void; icon: React.ReactNode; children: React.ReactNode }) {
+   174→   174→  return (
+   175→   175→    <button
+   176→   176→      onClick={onClick}
+   177→   177→      className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
+   178→   178→        active ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'
+   179→   179→      }`}
+   180→   180→    >
+   181→   181→      {icon}
+   182→   182→      {children}
+   183→   183→    </button>
+   184→   184→  )
+   185→   185→}
+   186→   186→
+   187→   187→// =================================================================
+   188→   188→// PROFILE TAB
+   189→   189→// =================================================================
+   190→   190→function ProfileTab({ company, customColumns, onChanged, revealed, setRevealed }: { company: CompanyFull; customColumns: CustomColumn[]; onChanged: () => void; revealed: boolean; setRevealed: (b: boolean) => void }) {
+   191→   191→  const [name, setName] = useState(company.name)
+   192→   192→  const [description, setDescription] = useState(company.description || '')
+   193→   193→  const [email, setEmail] = useState(company.email || '')
+   194→   194→  const [phone, setPhone] = useState(company.phone || '')
+   195→   195→  const [website, setWebsite] = useState(company.website || '')
+   196→   196→  const [locationId, setLocationId] = useState(company.locationId || '')
+   197→   197→  const [customValues, setCustomValues] = useState<Record<string, string>>(() => {
+   198→   198→    const map: Record<string, string> = {}
+   199→   199→    company.customValues?.forEach((cv) => { map[cv.customColumnId] = cv.value })
+   200→   200→    return map
+   201→   201→  })
+   202→   202→  const [lookup, setLookup] = useState<Lookup | null>(null)
+   203→   203→  const [saving, setSaving] = useState(false)
+   204→   204→  const [savingCustom, setSavingCustom] = useState(false)
+   205→   205→  const { toast } = useToast()
+   206→   206→
+   207→   207→  useEffect(() => {
+   208→   208→    api<Lookup>('/api/company/lookup').then(setLookup).catch(() => {})
+   209→   209→  }, [])
+   210→   210→
+   211→   211→  const save = async (e: React.FormEvent) => {
+   212→   212→    e.preventDefault()
+   213→   213→    setSaving(true)
+   214→   214→    try {
+   215→   215→      await api('/api/company/self', { method: 'PUT', body: { name, description, email, phone, website, locationId: locationId || null } })
+   216→   216→      toast({ title: 'Saved', description: 'Your profile has been updated' })
+   217→   217→      onChanged()
+   218→   218→    } catch (e: any) {
+   219→   219→      toast({ title: 'Error', description: e.message, variant: 'destructive' })
+   220→   220→    } finally {
+   221→   221→      setSaving(false)
+   222→   222→    }
+   223→   223→  }
+   224→   224→
+   225→   225→  const saveCustomValues = async () => {
+   226→   226→ setSavingCustom(true)
+   227→   227→    try {
+   228→   228→      await api('/api/company/self', { method: 'PUT', body: { customValues } })
+   229→   229→      toast({ title: 'Saved', description: 'Custom fields updated' })
+   230→   230→      onChanged()
+   231→   231→    } catch (e: any) {
+   232→   232→      toast({ title: 'Error', description: e.message, variant: 'destructive' })
+   233→   233→    } finally {
+   234→   234→      setSavingCustom(false)
+   235→   235→    }
+   236→   236→  }
+   237→   237→
+   238→   238→  return (
+   239→   239→    <div className="space-y-4">
+   240→   240→      <Card>
+   241→   241→        <CardHeader>
+   242→   242→          <CardTitle className="text-base">Company profile</CardTitle>
+   243→   243→          <CardDescription>Update your company's public information. Sector and city are managed by the SEECS admin.</CardDescription>
+   244→   244→        </CardHeader>
+   245→   245→        <CardContent>
+   246→   246→          <form onSubmit={save} className="space-y-4">
+   247→   247→            <div className="grid sm:grid-cols-2 gap-3">
+   248→   248→              <div className="space-y-1.5 sm:col-span-2">
+   249→   249→                <Label>Company name</Label>
+   250→   250→                <Input value={name} onChange={(e) => setName(e.target.value)} required />
+   251→   251→              </div>
+   252→   252→              <div className="space-y-1.5 sm:col-span-2">
+   253→   253→                <Label>Description</Label>
+   254→   254→                <Textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} />
+   255→   255→              </div>
+   256→   256→              <div className="space-y-1.5">
+   257→   257→                <Label>Email</Label>
+   258→   258→                <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+   259→   259→              </div>
+   260→   260→              <div className="space-y-1.5">
+   261→   261→                <Label>Phone</Label>
+   262→   262→                <Input value={phone} onChange={(e) => setPhone(e.target.value)} />
+   263→   263→              </div>
+   264→   264→              <div className="space-y-1.5 sm:col-span-2">
+   265→   265→                <Label>Website</Label>
+   266→   266→                <Input value={website} onChange={(e) => setWebsite(e.target.value)} placeholder="https://…" />
+   267→   267→              </div>
+   268→   268→              <div className="space-y-1.5 sm:col-span-2">
+   269→   269→                <Label>Office location</Label>
+   270→   270→                <select
+   271→   271→                  className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+   272→   272→                  value={locationId}
+   273→   273→                  onChange={(e) => setLocationId(e.target.value)}
+   274→   274→                >
+   275→   275→                  <option value="">— None —</option>
+   276→   276→                  {lookup?.locations.map((l) => <option key={l.id} value={l.id}>{l.address} · {l.city.name}</option>)}
+   277→   277→                </select>
+   278→   278→              </div>
+   279→   279→            </div>
+   280→   280→
+   281→   281→            <div className="grid sm:grid-cols-2 gap-3 pt-3 border-t">
+   282→   282→              <div>
+   283→   283→                <Label className="text-xs text-muted-foreground">Sector (managed by admin)</Label>
+   284→   284→                <div className="text-sm font-medium mt-1">{company.sector.name}</div>
+   285→   285→              </div>
+   286→   286→              <div>
+   287→   287→                <Label className="text-xs text-muted-foreground">City (managed by admin)</Label>
+   288→   288→                <div className="text-sm font-medium mt-1">{company.city.name}</div>
+   289→   289→              </div>
+   290→   290→            </div>
+   291→   291→
+   292→   292→            {(company.status || company.foundedYear || company.sinceDate || company.branchesCount || company.revenue != null || company.revenueMin != null) && (
+   293→   293→              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3 pt-3 border-t">
+   294→   294→                {company.status && (
+   295→   295→                  <div>
+   296→   296→                    <Label className="text-xs text-muted-foreground">Status</Label>
+   297→   297→                    <div className="mt-1">
+   298→   298→                      <Badge variant="outline" className={`text-xs ${STATUS_STYLES[company.status] || ''}`}>{company.status}</Badge>
+   299→   299→                    </div>
+   300→   300→                  </div>
+   301→   301→                )}
+   302→   302→                {company.foundedYear && (
+   303→   303→                  <div>
+   304→   304→                    <Label className="text-xs text-muted-foreground">Founded year</Label>
+   305→   305→                    <div className="text-sm font-medium mt-1">{company.foundedYear}</div>
+   306→   306→                  </div>
+   307→   307→                )}
+   308→   308→                {company.sinceDate && (
+   309→   309→                  <div>
+   310→   310→                    <Label className="text-xs text-muted-foreground">Since date</Label>
+   311→   311→                    <div className="text-sm font-medium mt-1">{company.sinceDate}</div>
+   312→   312→                  </div>
+   313→   313→                )}
+   314→   314→                {company.branchesCount != null && (
+   315→   315→                  <div>
+   316→   316→                    <Label className="text-xs text-muted-foreground">Branches</Label>
+   317→   317→                    <div className="text-sm font-medium mt-1">{company.branchesCount}</div>
+   318→   318→                  </div>
+   319→   319→                )}
+   320→   320→                {company.revenue != null ? (
+   321→   321→                  <div>
+   322→   322→                    <Label className="text-xs text-muted-foreground">Revenue</Label>
+   323→   323→                    <div className="text-sm font-medium mt-1">{formatCurrency(company.revenue)}</div>
+   324→   324→                  </div>
+   325→   325→                ) : (company.revenueMin != null || company.revenueMax != null) ? (
+   326→   326→                  <div>
+   327→   327→                    <Label className="text-xs text-muted-foreground">Revenue range</Label>
+   328→   328→                    <div className="text-sm font-medium mt-1">{formatCurrency(company.revenueMin || 0)} – {formatCurrency(company.revenueMax || 0)}</div>
+   329→   329→                  </div>
+   330→   330→                ) : null}
+   331→   331→                {company.statusReason && (
+   332→   332→                  <div className="sm:col-span-2">
+   333→   333→                    <Label className="text-xs text-muted-foreground">Status reason</Label>
+   334→   334→                    <div className="text-sm font-medium mt-1">{company.statusReason}</div>
+   335→   335→                  </div>
+   336→   336→                )}
+   337→   337→              </div>
+   338→   338→            )}
+   339→   339→
+   340→   340→            <div className="flex justify-end">
+   341→   341→              <Button type="submit" disabled={saving}>
+   342→   342→                {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+   343→   343→                Save changes
+   344→   344→              </Button>
+   345→   345→            </div>
+   346→   346→          </form>
+   347→   347→        </CardContent>
+   348→   348→      </Card>
+   349→   349→
+   350→   350→      {/* Custom columns card */}
+   351→   351→      {customColumns.length > 0 && (
+   352→   352→        <Card>
+   353→   353→          <CardHeader>
+   354→   354→            <CardTitle className="text-base flex items-center gap-2"><Columns3 className="h-4 w-4" /> Custom fields</CardTitle>
+   355→   355→            <CardDescription>Additional fields defined by the SEECS admin. Fill these in to provide extra information about your company.</CardDescription>
+   356→   356→          </CardHeader>
+   357→   357→          <CardContent className="space-y-4">
+   358→   358→            <div className="grid sm:grid-cols-2 gap-3">
+   359→   359→              {customColumns.map((col) => (
+   360→   360→                <div key={col.id} className="space-y-1.5">
+   361→   361→                  <Label>{col.name}{col.required && <span className="text-destructive ml-1">*</span>}{col.description && <span className="text-xs text-muted-foreground ml-1.5">— {col.description}</span>}</Label>
+   362→   362→                  {col.columnType === 'number' ? (
+   363→   363→                    <Input
+   364→   364→                      type="number"
+   365→   365→                      value={customValues[col.id] || ''}
+   366→   366→                      onChange={(e) => setCustomValues((s) => ({ ...s, [col.id]: e.target.value }))}
+   367→   367→                      placeholder={col.required ? 'Required' : 'Optional'}
+   368→   368→                    />
+   369→   369→                  ) : col.columnType === 'date' ? (
+   370→   370→                    <Input
+   371→   371→                      type="date"
+   372→   372→                      value={customValues[col.id] || ''}
+   373→   373→                      onChange={(e) => setCustomValues((s) => ({ ...s, [col.id]: e.target.value }))}
+   374→   374→                    />
+   375→   375→                  ) : col.columnType === 'boolean' ? (
+   376→   376→                    <label className="flex items-center gap-2 h-9 cursor-pointer">
+   377→   377→                      <input
+   378→   378→                        type="checkbox"
+   379→   379→                        checked={customValues[col.id] === 'true' || customValues[col.id] === '1'}
+   380→   380→                        onChange={(e) => setCustomValues((s) => ({ ...s, [col.id]: e.target.checked ? 'true' : 'false' }))}
+   381→   381→                        className="accent-primary"
+   382→   382→                      />
+   383→   383→                      <span className="text-sm">{customValues[col.id] === 'true' ? 'Yes' : 'No'}</span>
+   384→   384→                    </label>
+   385→   385→                  ) : col.columnType === 'url' ? (
+   386→   386→                    <Input
+   387→   387→                      type="url"
+   388→   388→                      value={customValues[col.id] || ''}
+   389→   389→                      onChange={(e) => setCustomValues((s) => ({ ...s, [col.id]: e.target.value }))}
+   390→   390→                      placeholder="https://…"
+   391→   391→                    />
+   392→   392→                  ) : (
+   393→   393→                    <Input
+   394→   394→                      value={customValues[col.id] || ''}
+   395→   395→                      onChange={(e) => setCustomValues((s) => ({ ...s, [col.id]: e.target.value }))}
+   396→   396→                      placeholder={col.required ? 'Required' : 'Optional'}
+   397→   397→                    />
+   398→   398→                  )}
+   399→   399→                </div>
+   400→   400→              ))}
+   401→   401→            </div>
+   402→   402→            <div className="flex justify-end">
+   403→   403→              <Button onClick={saveCustomValues} disabled={savingCustom}>
+   404→   404→                {savingCustom && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+   405→   405→                Save custom fields
+   406→   406→              </Button>
+   407→   407→            </div>
+   408→   408→          </CardContent>
+   409→   409→        </Card>
+   410→   410→      )}
+   411→   411→
+   412→   412→      {/* API key card */}
+   413→   413→      <Card>
+   414→   414→        <CardHeader>
+   415→   415→          <CardTitle className="text-base flex items-center gap-2"><KeyRound className="h-4 w-4" /> Your API key</CardTitle>
+   416→   416→          <CardDescription>Keep this secret. Anyone with it can sign in to your company portal.</CardDescription>
+   417→   417→        </CardHeader>
+   418→   418→        <CardContent className="space-y-3">
+   419→   419→          <div className="flex items-center gap-2">
+   420→   420→            <code className="flex-1 text-xs font-mono bg-muted px-3 py-2.5 rounded break-all">
+   421→   421→              {revealed ? company.apiKey : `${company.apiKey.slice(0, 14)}••••••••••••••••`}
+   422→   422→            </code>
+   423→   423→            <Button variant="outline" size="sm" onClick={() => setRevealed(!revealed)}>
+   424→   424→              {revealed ? 'Hide' : 'Reveal'}
+   425→   425→            </Button>
+   426→   426→            <Button variant="outline" size="sm" onClick={() => { navigator.clipboard?.writeText(company.apiKey); toast({ title: 'Copied' }) }}>
+   427→   427→              <Copy className="h-4 w-4" />
+   428→   428→            </Button>
+   429→   429→          </div>
+   430→   430→          <Alert>
+   431→   431→            <AlertDescription>
+   432→   432→              To rotate or revoke this key, contact the SEECS database manager. A revoked key immediately loses access.
+   433→   433→            </AlertDescription>
+   434→   434→          </Alert>
+   435→   435→        </CardContent>
+   436→   436→      </Card>
+   437→   437→    </div>
+   438→   438→  )
+   439→   439→}
+   440→   440→
+   441→   441→// =================================================================
+   442→   442→// FOUNDERS TAB
+   443→   443→// =================================================================
+   444→   444→function FoundersTab({ company, onChanged }: { company: CompanyFull; onChanged: () => void }) {
+   445→   445→  const [lookup, setLookup] = useState<Lookup | null>(null)
+   446→   446→  const [adding, setAdding] = useState(false)
+   447→   447→  const [addingExisting, setAddingExisting] = useState(false)
+   448→   448→  const [deleting, setDeleting] = useState<string | null>(null)
+   449→   449→  const { toast } = useToast()
+   450→   450→
+   451→   451→  useEffect(() => {
+   452→   452→    api<Lookup>('/api/company/self/founders').then(setLookup).catch(() => {})
+   453→   453→  }, [])
+   454→   454→
+   455→   455→  const attach = async (founderId: string) => {
+   456→   456→    try {
+   457→   457→      await api('/api/company/self/founders', { method: 'POST', body: { founderId } })
+   458→   458→      toast({ title: 'Attached', description: 'Founder added to your company' })
+   459→   459→      setAddingExisting(false)
+   460→   460→      onChanged()
+   461→   461→    } catch (e: any) {
+   462→   462→      toast({ title: 'Error', description: e.message, variant: 'destructive' })
+   463→   463→    }
+   464→   464→  }
+   465→   465→
+   466→   466→  return (
+   467→   467→    <div className="space-y-4">
+   468→   468→      <Card>
+   469→   469→        <CardHeader className="flex flex-row items-center justify-between space-y-0">
+   470→   470→          <div>
+   471→   471→            <CardTitle className="text-base">Founders & team</CardTitle>
+   472→   472→            <CardDescription>People associated with {company.name}. Adding a founder here does NOT give them access to the portal — only you can sign in with the API key.</CardDescription>
+   473→   473→          </div>
+   474→   474→          <div className="flex gap-2">
+   475→   475→            <Button variant="outline" size="sm" onClick={() => setAddingExisting(true)}>
+   476→   476→              <Plus className="h-4 w-4 mr-1" /> Existing
+   477→   477→            </Button>
+   478→   478→            <Button size="sm" onClick={() => setAdding(true)}>
+   479→   479→              <Plus className="h-4 w-4 mr-1" /> New
+   480→   480→            </Button>
+   481→   481→          </div>
+   482→   482→        </CardHeader>
+   483→   483→        <CardContent>
+   484→   484→          {company.founders.length === 0 ? (
+   485→   485→            <div className="text-center py-10 text-muted-foreground text-sm">
+   486→   486→              <Users className="h-8 w-8 mx-auto mb-2 opacity-40" />
+   487→   487→              No founders yet. Add the people who lead {company.name}.
+   488→   488→            </div>
+   489→   489→          ) : (
+   490→   490→            <div className="grid gap-2">
+   491→   491→              {company.founders.map((cf) => (
+   492→   492→                <div key={cf.id} className="flex items-center gap-3 p-3 border rounded-lg">
+   493→   493→                  <div className="h-9 w-9 rounded-full bg-muted grid place-items-center text-xs font-semibold">
+   494→   494→                    {cf.founder.firstName.charAt(0)}{cf.founder.lastName.charAt(0)}
+   495→   495→                  </div>
+   496→   496→                  <div className="flex-1 min-w-0">
+   497→   497→                    <div className="font-medium text-sm">{cf.founder.firstName} {cf.founder.lastName}</div>
+   498→   498→                    <div className="text-xs text-muted-foreground">
+   499→   499→                      {cf.founder.degree?.name || 'No degree'} · {cf.founder.email || cf.founder.phone || 'No contact'}
+   500→   500→                    </div>
+   501→   501→                  </div>
+   502→   502→                  <Badge variant="outline">{cf.role}</Badge>
+   503→   503→                  <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => setDeleting(cf.founder.id)}>
+   504→   504→                    <Trash2 className="h-4 w-4" />
+   505→   505→                  </Button>
+   506→   506→                </div>
+   507→   507→              ))}
+   508→   508→            </div>
+   509→   509→          )}
+   510→   510→        </CardContent>
+   511→   511→      </Card>
+   512→   512→
+   513→   513→      {/* Add new founder */}
+   514→   514→      <FounderFormDialog
+   515→   515→        open={adding}
+   516→   516→        onOpenChange={setAdding}
+   517→   517→        lookup={lookup}
+   518→   518→        onSaved={() => { setAdding(false); onChanged() }}
+   519→   519→      />
+   520→   520→
+   521→   521→      {/* Attach existing */}
+   522→   522→      <Dialog open={addingExisting} onOpenChange={setAddingExisting}>
+   523→   523→        <DialogContent className="max-w-md">
+   524→   524→          <DialogHeader>
+   525→   525→            <DialogTitle>Add existing founder</DialogTitle>
+   526→   526→            <DialogDescription>Pick a founder already in the registry to attach to {company.name}.</DialogDescription>
+   527→   527→          </DialogHeader>
+   528→   528→          <div className="max-h-80 overflow-y-auto space-y-1">
+   529→   529→            {lookup?.founders.filter((f) => !company.founders.some((cf) => cf.founder.id === f.id)).map((f) => (
+   530→   530→              <button
+   531→   531→                key={f.id}
+   532→   532→                onClick={() => attach(f.id)}
+   533→   533→                className="w-full flex items-center gap-3 p-2 rounded-md hover:bg-muted text-left"
+   534→   534→              >
+   535→   535→                <div className="h-8 w-8 rounded-full bg-muted grid place-items-center text-xs font-semibold">
+   536→   536→                  {f.firstName.charAt(0)}{f.lastName.charAt(0)}
+   537→   537→                </div>
+   538→   538→                <div className="flex-1">
+   539→   539→                  <div className="text-sm font-medium">{f.firstName} {f.lastName}</div>
+   540→   540→                  <div className="text-xs text-muted-foreground">{f.gender}</div>
+   541→   541→                </div>
+   542→   542→                <Plus className="h-4 w-4 text-muted-foreground" />
+   543→   543→              </button>
+   544→   544→            ))}
+   545→   545→            {lookup && lookup.founders.filter((f) => !company.founders.some((cf) => cf.founder.id === f.id)).length === 0 && (
+   546→   546→              <div className="text-center py-8 text-sm text-muted-foreground">No more founders available to add.</div>
+   547→   547→            )}
+   548→   548→          </div>
+   549→   549→        </DialogContent>
+   550→   550→      </Dialog>
+   551→   551→
+   552→   552→      {/* Detach confirm */}
+   553→   553→      <AlertDialog open={!!deleting} onOpenChange={(o) => !o && setDeleting(null)}>
+   554→   554→        <AlertDialogContent>
+   555→   555→          <AlertDialogHeader>
+   556→   556→            <AlertDialogTitle>Remove this founder from {company.name}?</AlertDialogTitle>
+   557→   557→            <AlertDialogDescription>
+   558→   558→              The founder record stays in the SEECS registry (they may be attached to other companies) but will no longer be associated with your company.
+   559→   559→            </AlertDialogDescription>
+   560→   560→          </AlertDialogHeader>
+   561→   561→          <AlertDialogFooter>
+   562→   562→            <AlertDialogCancel>Cancel</AlertDialogCancel>
+   563→   563→            <AlertDialogAction
+   564→   564→              onClick={async () => {
+   565→   565→                try {
+   566→   566→                  await api(`/api/company/self/founders/${deleting}`, { method: 'DELETE' })
+   567→   567→                  toast({ title: 'Removed', description: 'Founder detached from your company' })
+   568→   568→                  setDeleting(null)
+   569→   569→                  onChanged()
+   570→   570→                } catch (e: any) {
+   571→   571→                  toast({ title: 'Error', description: e.message, variant: 'destructive' })
+   572→   572→                }
+   573→   573→              }}
+   574→   574→            >
+   575→   575→              Remove
+   576→   576→            </AlertDialogAction>
+   577→   577→          </AlertDialogFooter>
+   578→   578→        </AlertDialogContent>
+   579→   579→      </AlertDialog>
+   580→   580→    </div>
+   581→   581→  )
+   582→   582→}
+   583→   583→
+   584→   584→function FounderFormDialog({ open, onOpenChange, lookup, onSaved }: { open: boolean; onOpenChange: (o: boolean) => void; lookup: Lookup | null; onSaved: () => void }) {
+   585→   585→  const [firstName, setFirstName] = useState('')
+   586→   586→  const [lastName, setLastName] = useState('')
+   587→   587→  const [gender, setGender] = useState('Male')
+   588→   588→  const [email, setEmail] = useState('')
+   589→   589→  const [phone, setPhone] = useState('')
+   590→   590→  const [degreeId, setDegreeId] = useState('')
+   591→   591→  const [role, setRole] = useState('Co-Founder')
+   592→   592→  const [saving, setSaving] = useState(false)
+   593→   593→  const { toast } = useToast()
+   594→   594→
+   595→   595→  useEffect(() => {
+   596→   596→    if (open) {
+   597→   597→      setFirstName(''); setLastName(''); setGender('Male'); setEmail(''); setPhone(''); setDegreeId(''); setRole('Co-Founder')
+   598→   598→    }
+   599→   599→  }, [open])
+   600→   600→
+   601→   601→  const submit = async (e: React.FormEvent) => {
+   602→   602→    e.preventDefault()
+   603→   603→    setSaving(true)
+   604→   604→    try {
+   605→   605→      await api('/api/company/self/founders', { method: 'POST', body: { firstName, lastName, gender, email, phone, degreeId: degreeId || null, role } })
+   606→   606→      toast({ title: 'Added', description: 'Founder added to your company' })
+   607→   607→      onSaved()
+   608→   608→    } catch (e: any) {
+   609→   609→      toast({ title: 'Error', description: e.message, variant: 'destructive' })
+   610→   610→    } finally {
+   611→   611→      setSaving(false)
+   612→   612→    }
+   613→   613→  }
+   614→   614→
+   615→   615→  return (
+   616→   616→    <Dialog open={open} onOpenChange={onOpenChange}>
+   617→   617→      <DialogContent>
+   618→   618→        <DialogHeader>
+   619→   619→          <DialogTitle>Add a new founder</DialogTitle>
+   620→   620→          <DialogDescription>This founder will be created in the SEECS registry and attached to your company.</DialogDescription>
+   621→   621→        </DialogHeader>
+   622→   622→        <form onSubmit={submit} className="space-y-3">
+   623→   623→          <div className="grid grid-cols-2 gap-3">
+   624→   624→            <div className="space-y-1.5">
+   625→   625→              <Label>First name *</Label>
+   626→   626→              <Input value={firstName} onChange={(e) => setFirstName(e.target.value)} required />
+   627→   627→            </div>
+   628→   628→            <div className="space-y-1.5">
+   629→   629→              <Label>Last name *</Label>
+   630→   630→              <Input value={lastName} onChange={(e) => setLastName(e.target.value)} required />
+   631→   631→            </div>
+   632→   632→            <div className="space-y-1.5">
+   633→   633→              <Label>Gender *</Label>
+   634→   634→              <select className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm" value={gender} onChange={(e) => setGender(e.target.value)}>
+   635→   635→                <option>Male</option>
+   636→   636→                <option>Female</option>
+   637→   637→                <option>Other</option>
+   638→   638→              </select>
+   639→   639→            </div>
+   640→   640→            <div className="space-y-1.5">
+   641→   641→              <Label>Role</Label>
+   642→   642→              <Input value={role} onChange={(e) => setRole(e.target.value)} placeholder="CEO / CTO / Co-Founder" />
+   643→   643→            </div>
+   644→   644→            <div className="space-y-1.5">
+   645→   645→              <Label>Email</Label>
+   646→   646→              <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+   647→   647→            </div>
+   648→   648→            <div className="space-y-1.5">
+   649→   649→              <Label>Phone</Label>
+   650→   650→              <Input value={phone} onChange={(e) => setPhone(e.target.value)} />
+   651→   651→            </div>
+   652→   652→            <div className="space-y-1.5 col-span-2">
+   653→   653→              <Label>Degree</Label>
+   654→   654→              <select className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm" value={degreeId} onChange={(e) => setDegreeId(e.target.value)}>
+   655→   655→                <option value="">— None —</option>
+   656→   656→                {lookup?.degrees.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+   657→   657→              </select>
+   658→   658→            </div>
+   659→   659→          </div>
+   660→   660→          <DialogFooter>
+   661→   661→            <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
+   662→   662→            <Button type="submit" disabled={saving}>
+   663→   663→              {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+   664→   664→              Add founder
+   665→   665→            </Button>
+   666→   666→          </DialogFooter>
+   667→   667→        </form>
+   668→   668→      </DialogContent>
+   669→   669→    </Dialog>
+   670→   670→  )
+   671→   671→}
+   672→   672→
+   673→   673→// =================================================================
+   674→   674→// ANNUAL DATA TAB
+   675→   675→// =================================================================
+   676→   676→function AnnualTab({ company, onChanged }: { company: CompanyFull; onChanged: () => void }) {
+   677→   677→  const [editing, setEditing] = useState<{ id: string; year: number; monthlyRevenue: number; totalRevenue: number; employeeCount: number; projectCount: number; notes: string | null } | null>(null)
+   678→   678→  const [creating, setCreating] = useState(false)
+   679→   679→  const [deleting, setDeleting] = useState<string | null>(null)
+   680→   680→  const { toast } = useToast()
+   681→   681→
+   682→   682→  return (
+   683→   683→    <div className="space-y-4">
+   684→   684→      <Card>
+   685→   685→        <CardHeader className="flex flex-row items-center justify-between space-y-0">
+   686→   686→          <div>
+   687→   687→            <CardTitle className="text-base">Annual financial data</CardTitle>
+   688→   688→            <CardDescription>Report your company's revenue, headcount and project count for each year.</CardDescription>
+   689→   689→          </div>
+   690→   690→          <Button size="sm" onClick={() => setCreating(true)}>
+   691→   691→            <Plus className="h-4 w-4 mr-1" /> Add year
+   692→   692→          </Button>
+   693→   693→        </CardHeader>
+   694→   694→        <CardContent>
+   695→   695→          {company.annualData.length === 0 ? (
+   696→   696→            <div className="text-center py-10 text-muted-foreground text-sm">
+   697→   697→              <DollarSign className="h-8 w-8 mx-auto mb-2 opacity-40" />
+   698→   698→              No annual data yet. Add your first year of financial performance.
+   699→   699→            </div>
+   700→   700→          ) : (
+   701→   701→            <div className="overflow-x-auto">
+   702→   702→              <table className="w-full text-sm">
+   703→   703→                <thead>
+   704→   704→                  <tr className="text-left text-xs uppercase tracking-wider text-muted-foreground border-b">
+   705→   705→                    <th className="py-2 pr-4 font-medium">Year</th>
+   706→   706→                    <th className="py-2 pr-4 font-medium">Monthly rev.</th>
+   707→   707→                    <th className="py-2 pr-4 font-medium">Total rev.</th>
+   708→   708→                    <th className="py-2 pr-4 font-medium">Employees</th>
+   709→   709→                    <th className="py-2 pr-4 font-medium">Projects</th>
+   710→   710→                    <th className="py-2 font-medium text-right">Actions</th>
+   711→   711→                  </tr>
+   712→   712→                </thead>
+   713→   713→                <tbody>
+   714→   714→                  {company.annualData.map((r) => (
+   715→   715→                    <tr key={r.id} className="border-b last:border-0 hover:bg-muted/40">
+   716→   716→                      <td className="py-2.5 pr-4 font-medium">{r.year}</td>
+   717→   717→                      <td className="py-2.5 pr-4">{formatCurrency(r.monthlyRevenue)}</td>
+   718→   718→                      <td className="py-2.5 pr-4">{formatCurrency(r.totalRevenue)}</td>
+   719→   719→                      <td className="py-2.5 pr-4">{r.employeeCount}</td>
+   720→   720→                      <td className="py-2.5 pr-4">{r.projectCount}</td>
+   721→   721→                      <td className="py-2.5 text-right">
+   722→   722→                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setEditing(r)}>
+   723→   723→                          <Pencil className="h-3.5 w-3.5" />
+   724→   724→                        </Button>
+   725→   725→                        <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => setDeleting(r.id)}>
+   726→   726→                          <Trash2 className="h-3.5 w-3.5" />
+   727→   727→                        </Button>
+   728→   728→                      </td>
+   729→   729→                    </tr>
+   730→   730→                  ))}
+   731→   731→                </tbody>
+   732→   732→              </table>
+   733→   733→            </div>
+   734→   734→          )}
+   735→   735→        </CardContent>
+   736→   736→      </Card>
+   737→   737→
+   738→   738→      <AnnualFormDialog open={creating} onOpenChange={setCreating} onSaved={() => { setCreating(false); onChanged() }} />
+   739→   739→      <AnnualFormDialog open={!!editing} onOpenChange={(o) => !o && setEditing(null)} existing={editing || undefined} onSaved={() => { setEditing(null); onChanged() }} />
+   740→   740→
+   741→   741→      <AlertDialog open={!!deleting} onOpenChange={(o) => !o && setDeleting(null)}>
+   742→   742→        <AlertDialogContent>
+   743→   743→          <AlertDialogHeader>
+   744→   744→            <AlertDialogTitle>Delete this annual record?</AlertDialogTitle>
+   745→   745→            <AlertDialogDescription>This removes the revenue data for that year. You can re-add it later.</AlertDialogDescription>
+   746→   746→          </AlertDialogHeader>
+   747→   747→          <AlertDialogFooter>
+   748→   748→            <AlertDialogCancel>Cancel</AlertDialogCancel>
+   749→   749→            <AlertDialogAction
+   750→   750→              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+   751→   751→              onClick={async () => {
+   752→   752→                try {
+   753→   753→                  await api(`/api/company/self/annual-data/${deleting}`, { method: 'DELETE' })
+   754→   754→                  toast({ title: 'Deleted', description: 'Annual record removed' })
+   755→   755→                  setDeleting(null)
+   756→   756→                  onChanged()
+   757→   757→                } catch (e: any) {
+   758→   758→                  toast({ title: 'Error', description: e.message, variant: 'destructive' })
+   759→   759→                }
+   760→   760→              }}
+   761→   761→            >
+   762→   762→              Delete
+   763→   763→            </AlertDialogAction>
+   764→   764→          </AlertDialogFooter>
+   765→   765→        </AlertDialogContent>
+   766→   766→      </AlertDialog>
+   767→   767→    </div>
+   768→   768→  )
+   769→   769→}
+   770→   770→
+   771→   771→function AnnualFormDialog({ open, onOpenChange, existing, onSaved }: { open: boolean; onOpenChange: (o: boolean) => void; existing?: { id: string; year: number; monthlyRevenue: number; totalRevenue: number; employeeCount: number; projectCount: number; notes: string }; onSaved: () => void }) {
+   772→   772→  const [year, setYear] = useState('')
+   773→   773→  const [monthlyRevenue, setMonthlyRevenue] = useState('')
+   774→   774→  const [totalRevenue, setTotalRevenue] = useState('')
+   775→   775→  const [employeeCount, setEmployeeCount] = useState('')
+   776→   776→  const [projectCount, setProjectCount] = useState('')
+   777→   777→  const [notes, setNotes] = useState('')
+   778→   778→  const [saving, setSaving] = useState(false)
+   779→   779→  const { toast } = useToast()
+   780→   780→
+   781→   781→  useEffect(() => {
+   782→   782→    if (open) {
+   783→   783→      setYear(existing ? String(existing.year) : String(new Date().getFullYear() - 1))
+   784→   784→      setMonthlyRevenue(existing ? String(existing.monthlyRevenue) : '')
+   785→   785→      setTotalRevenue(existing ? String(existing.totalRevenue) : '')
+   786→   786→      setEmployeeCount(existing ? String(existing.employeeCount) : '')
+   787→   787→      setProjectCount(existing ? String(existing.projectCount) : '')
+   788→   788→      setNotes(existing?.notes || '')
+   789→   789→    }
+   790→   790→  }, [open, existing])
+   791→   791→
+   792→   792→  const submit = async (e: React.FormEvent) => {
+   793→   793→    e.preventDefault()
+   794→   794→    setSaving(true)
+   795→   795→    try {
+   796→   796→      const body = {
+   797→   797→        year: Number(year),
+   798→   798→        monthlyRevenue: Number(monthlyRevenue) || 0,
+   799→   799→        totalRevenue: Number(totalRevenue) || (Number(monthlyRevenue) || 0) * 12,
+   800→   800→        employeeCount: Number(employeeCount) || 0,
+   801→   801→        projectCount: Number(projectCount) || 0,
+   802→   802→        notes: notes || null,
+   803→   803→      }
+   804→   804→      if (existing) {
+   805→   805→        await api(`/api/company/self/annual-data/${existing.id}`, { method: 'PUT', body })
+   806→   806→        toast({ title: 'Saved', description: 'Annual data updated' })
+   807→   807→      } else {
+   808→   808→        await api('/api/company/self/annual-data', { method: 'POST', body })
+   809→   809→        toast({ title: 'Added', description: 'Annual data added' })
+   810→   810→      }
+   811→   811→      onSaved()
+   812→   812→    } catch (e: any) {
+   813→   813→      toast({ title: 'Error', description: e.message, variant: 'destructive' })
+   814→   814→    } finally {
+   815→   815→      setSaving(false)
+   816→   816→    }
+   817→   817→  }
+   818→   818→
+   819→   819→  return (
+   820→   820→    <Dialog open={open} onOpenChange={onOpenChange}>
+   821→   821→      <DialogContent>
+   822→   822→        <DialogHeader>
+   823→   823→          <DialogTitle>{existing ? 'Edit annual data' : 'Add annual data'}</DialogTitle>
+   824→   824→          <DialogDescription>Report your company's financial performance for a specific year.</DialogDescription>
+   825→   825→        </DialogHeader>
+   826→   826→        <form onSubmit={submit} className="space-y-3">
+   827→   827→          <div className="grid grid-cols-2 gap-3">
+   828→   828→            <div className="space-y-1.5">
+   829→   829→              <Label>Year *</Label>
+   830→   830→              <Input type="number" value={year} onChange={(e) => setYear(e.target.value)} required min="2000" max="2100" />
+   831→   831→            </div>
+   832→   832→            <div className="space-y-1.5">
+   833→   833→              <Label>Monthly revenue (PKR)</Label>
+   834→   834→              <Input type="number" value={monthlyRevenue} onChange={(e) => setMonthlyRevenue(e.target.value)} placeholder="0" />
+   835→   835→            </div>
+   836→   836→            <div className="space-y-1.5">
+   837→   837→              <Label>Total revenue (PKR)</Label>
+   838→   838→              <Input type="number" value={totalRevenue} onChange={(e) => setTotalRevenue(e.target.value)} placeholder="auto = monthly × 12" />
+   839→   839→            </div>
+   840→   840→            <div className="space-y-1.5">
+   841→   841→              <Label>Employees</Label>
+   842→   842→              <Input type="number" value={employeeCount} onChange={(e) => setEmployeeCount(e.target.value)} placeholder="0" />
+   843→   843→            </div>
+   844→   844→            <div className="space-y-1.5">
+   845→   845→              <Label>Projects</Label>
+   846→   846→              <Input type="number" value={projectCount} onChange={(e) => setProjectCount(e.target.value)} placeholder="0" />
+   847→   847→            </div>
+   848→   848→            <div className="space-y-1.5 col-span-2">
+   849→   849→              <Label>Notes</Label>
+   850→   850→              <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} />
+   851→   851→            </div>
+   852→   852→          </div>
+   853→   853→          <DialogFooter>
+   854→   854→            <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
+   855→   855→            <Button type="submit" disabled={saving}>
+   856→   856→              {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+   857→   857→              {existing ? 'Save changes' : 'Add year'}
+   858→   858→            </Button>
+   859→   859→          </DialogFooter>
+   860→   860→        </form>
+   861→   861→      </DialogContent>
+   862→   862→    </Dialog>
+   863→   863→  )
+   864→   864→}
+   865→   865→

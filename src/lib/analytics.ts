@@ -20,7 +20,7 @@ export interface DashboardStats {
   byDegreeField: { name: string; value: number }[]
   byYear: { year: number; revenue: number; employees: number; projects: number }[]
   topCompaniesByRevenue: { name: string; revenue: number; sector: string }[]
-  recentCompanies: { id: string; name: string; sector: string; city: string; registeredAt: string; apiKey: string }[]
+  recentCompanies: { id: string; name: string; sector: string; city: string; registeredAt: string; apiKey: string; status: string | null }[]
   // monthly revenue trend per year (12 buckets per year, averaged across companies)
   monthlyTrend: { month: string; value: number }[]
 }
@@ -126,6 +126,7 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     city: c.city.name,
     registeredAt: c.registeredAt.toISOString(),
     apiKey: c.apiKey,
+    status: c.status,
   }))
 
   return {

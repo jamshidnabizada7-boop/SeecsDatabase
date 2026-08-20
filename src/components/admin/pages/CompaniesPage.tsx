@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { api, formatDate, formatCurrency } from '@/lib/client-utils'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -8,11 +8,13 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
 import { useToast } from '@/hooks/use-toast'
-import { Building2, Loader2, Plus, RefreshCw, Search, KeyRound, Pencil, Trash2, Copy, Eye, EyeOff, Columns3, ChevronDown, ChevronUp } from 'lucide-react'
+import { Building2, Loader2, Plus, RefreshCw, Search, KeyRound, Pencil, Trash2, Copy, Eye, EyeOff, Columns3, ChevronDown, ChevronUp, Download, LayoutGrid, List, RotateCw } from 'lucide-react'
 
 interface CustomColumn {
   id: string
@@ -78,6 +80,9 @@ const STATUS_STYLES: Record<string, string> = {
   Discontinued: 'bg-rose-50 text-rose-700 border-rose-200',
 }
 
+type ViewMode = 'card' | 'table'
+type StatusFilter = 'All' | 'Active' | 'Inactive' | 'Discontinued'
+
 export default function CompaniesPage() {
   const [items, setItems] = useState<Company[]>([])
   const [customColumns, setCustomColumns] = useState<CustomColumn[]>([])
@@ -89,6 +94,8 @@ export default function CompaniesPage() {
   const [deleting, setDeleting] = useState<Company | null>(null)
   const [revealedKeys, setRevealedKeys] = useState<Record<string, boolean>>({})
   const [showCustom, setShowCustom] = useState<Record<string, boolean>>({})
+  const [viewMode, setViewMode] = useState<ViewMode>('card')
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('All')
   const { toast } = useToast()
 
   const load = async () => {
@@ -113,26 +120,83 @@ export default function CompaniesPage() {
     return () => clearTimeout(t)
   }, [search])
 
+  const filteredItems = useMemo(() => {
+    if (statusFilter === 'All') return items
+    return items.filter((c) => c.status === statusFilter)
+  }, [items, statusFilter])
+
   const copyKey = (k: string) => {
     navigator.clipboard?.writeText(k)
     toast({ title: 'Copied', description: 'API key copied to clipboard' })
+  }
+
+  const regenerateKey = async (company: Company) => {
+    try {
+      await api(`/api/admin/companies/${company.id}`, {
+        method: 'PUT',
+        body: { ...company, regenerateKey: true },
+      })
+      toast({ title: 'Regenerated', description: 'A new API key has been generated' })
+      load()
+    } catch (e: any) {
+      toast({ title: 'Error', description: e.message, variant: 'destructive' })
+    }
+  }
+
+  const exportCSV = () => {
+    const headers = ['Name', 'Email', 'Phone', 'Website', 'Status', 'Since Date', 'Founded Year', 'Branches', 'Revenue', 'Sector', 'City', 'API Key']
+    const rows = filteredItems.map((c) => [
+      c.name,
+      c.email || '',
+      c.phone || '',
+      c.website || '',
+      c.status || '',
+      c.sinceDate || '',
+      c.foundedYear || '',
+      c.branchesCount || '',
+      c.revenue || '',
+      c.sector.name,
+      c.city.name,
+      c.apiKey,
+    ])
+    const csvContent = [headers, ...rows]
+      .map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+      .join('\n')
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `companies-export-${new Date().toISOString().slice(0, 10)}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+    toast({ title: 'Exported', description: `${filteredItems.length} companies exported as CSV` })
   }
 
   const getCustomValue = (company: Company, columnId: string) => {
     return company.customValues?.find((cv) => cv.customColumnId === columnId)?.value || ''
   }
 
+  const statusFilters: { label: string; value: StatusFilter; count: number }[] = [
+    { label: 'All', value: 'All', count: items.length },
+    { label: 'Active', value: 'Active', count: items.filter((c) => c.status === 'Active').length },
+    { label: 'Inactive', value: 'Inactive', count: items.filter((c) => c.status === 'Inactive').length },
+    { label: 'Discontinued', value: 'Discontinued', count: items.filter((c) => c.status === 'Discontinued').length },
+  ]
+
   return (
     <div className="p-4 sm:p-6 space-y-4 max-w-7xl mx-auto">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold">Companies</h1>
-          <p className="text-sm text-muted-foreground">{items.length} registered · master list with per-company API keys.</p>
+          <p className="text-sm text-muted-foreground">{filteredItems.length} shown · master list with per-company API keys.</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           <Button variant="outline" size="sm" onClick={load} disabled={loading}>
             {loading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-2" />}
             Refresh
+          </Button>
+          <Button variant="outline" size="sm" onClick={exportCSV}>
+            <Download className="h-4 w-4 mr-2" /> Export CSV
           </Button>
           <Button size="sm" onClick={() => setCreating(true)}>
             <Plus className="h-4 w-4 mr-2" /> Add company
@@ -140,21 +204,62 @@ export default function CompaniesPage() {
         </div>
       </div>
 
-      <div className="relative max-w-sm">
-        <Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-        <Input
-          placeholder="Search by name…"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="pl-9"
-        />
+      <div className="flex flex-col sm:flex-row gap-3">
+        <div className="relative max-w-sm flex-1">
+          <Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder="Search by name…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-9"
+          />
+        </div>
+        <div className="flex items-center gap-1.5">
+          {/* Status filter badges */}
+          {statusFilters.map((sf) => (
+            <button
+              key={sf.value}
+              onClick={() => setStatusFilter(sf.value)}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
+                statusFilter === sf.value
+                  ? 'bg-primary text-primary-foreground border-primary'
+                  : 'bg-background text-muted-foreground border-border hover:bg-muted hover:text-foreground'
+              }`}
+            >
+              {sf.label}
+              <span className={`tabular-nums ${statusFilter === sf.value ? 'text-primary-foreground/80' : 'text-muted-foreground/70'}`}>
+                {sf.count}
+              </span>
+            </button>
+          ))}
+          <div className="w-px h-6 bg-border mx-1" />
+          {/* View mode toggle */}
+          <Button
+            variant={viewMode === 'card' ? 'default' : 'ghost'}
+            size="icon"
+            className="h-8 w-8"
+            onClick={() => setViewMode('card')}
+            title="Card view"
+          >
+            <LayoutGrid className="h-4 w-4" />
+          </Button>
+          <Button
+            variant={viewMode === 'table' ? 'default' : 'ghost'}
+            size="icon"
+            className="h-8 w-8"
+            onClick={() => setViewMode('table')}
+            title="Table view"
+          >
+            <List className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
 
       {loading && items.length === 0 ? (
         <div className="py-12 text-center text-muted-foreground text-sm"><Loader2 className="h-5 w-5 animate-spin inline mr-2" />Loading…</div>
-      ) : (
+      ) : viewMode === 'card' ? (
         <div className="grid gap-3">
-          {items.map((c) => {
+          {filteredItems.map((c) => {
             const revealed = revealedKeys[c.id]
             const showCust = showCustom[c.id]
             return (
@@ -250,12 +355,30 @@ export default function CompaniesPage() {
                           <code className="text-xs font-mono bg-muted px-2 py-1 rounded flex-1 truncate">
                             {revealed ? c.apiKey : `${c.apiKey.slice(0, 14)}••••••••`}
                           </code>
-                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setRevealedKeys((s) => ({ ...s, [c.id]: !s[c.id] }))}>
-                            {revealed ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
-                          </Button>
-                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => copyKey(c.apiKey)}>
-                            <Copy className="h-3.5 w-3.5" />
-                          </Button>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setRevealedKeys((s) => ({ ...s, [c.id]: !s[c.id] }))}>
+                                {revealed ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>{revealed ? 'Hide key' : 'Reveal key'}</TooltipContent>
+                          </Tooltip>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => copyKey(c.apiKey)}>
+                                <Copy className="h-3.5 w-3.5" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Copy to clipboard</TooltipContent>
+                          </Tooltip>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-7 w-7 text-amber-600 hover:text-amber-700 hover:bg-amber-50" onClick={() => regenerateKey(c)}>
+                                <RotateCw className="h-3.5 w-3.5" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Regenerate key</TooltipContent>
+                          </Tooltip>
                         </div>
                       </div>
                       <div className="flex gap-2">
@@ -272,13 +395,110 @@ export default function CompaniesPage() {
               </Card>
             )
           })}
-          {items.length === 0 && (
+          {filteredItems.length === 0 && (
             <div className="py-16 text-center text-muted-foreground">
               <Building2 className="h-8 w-8 mx-auto mb-3 opacity-50" />
-              No companies yet. Add one or let companies self-register.
+              {statusFilter !== 'All' ? `No companies with status "${statusFilter}".` : 'No companies yet. Add one or let companies self-register.'}
             </div>
           )}
         </div>
+      ) : (
+        /* Table View */
+        <Card>
+          <CardContent className="p-0">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="pl-4">Name</TableHead>
+                  <TableHead>Sector</TableHead>
+                  <TableHead className="hidden md:table-cell">City</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="hidden lg:table-cell">Founded</TableHead>
+                  <TableHead className="hidden lg:table-cell">Revenue</TableHead>
+                  <TableHead>API Key</TableHead>
+                  <TableHead className="text-right pr-4">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredItems.map((c) => {
+                  const revealed = revealedKeys[c.id]
+                  return (
+                    <TableRow key={c.id}>
+                      <TableCell className="pl-4 font-medium max-w-[200px] truncate">
+                        <div className="truncate">{c.name}</div>
+                        {c.email && <div className="text-xs text-muted-foreground truncate">{c.email}</div>}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">{c.sector.name}</TableCell>
+                      <TableCell className="hidden md:table-cell text-muted-foreground">{c.city.name}</TableCell>
+                      <TableCell>
+                        {c.status ? (
+                          <Badge variant="outline" className={`text-xs ${STATUS_STYLES[c.status] || ''}`}>{c.status}</Badge>
+                        ) : c.apiKeyActive ? (
+                          <Badge variant="secondary" className="text-xs text-emerald-600 bg-emerald-50 border-emerald-200">Active</Badge>
+                        ) : (
+                          <Badge variant="destructive" className="text-xs bg-rose-50 text-rose-700 border-rose-200">Revoked</Badge>
+                        )}
+                      </TableCell>
+                      <TableCell className="hidden lg:table-cell text-muted-foreground">
+                        {c.foundedYear || '—'}
+                      </TableCell>
+                      <TableCell className="hidden lg:table-cell text-muted-foreground">
+                        {c.revenue != null ? formatCurrency(c.revenue) : '—'}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-0.5">
+                          <code className="text-xs font-mono bg-muted px-1.5 py-0.5 rounded max-w-[120px] truncate">
+                            {revealed ? c.apiKey : `${c.apiKey.slice(0, 10)}•••`}
+                          </code>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setRevealedKeys((s) => ({ ...s, [c.id]: !s[c.id] }))}>
+                                {revealed ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>{revealed ? 'Hide' : 'Reveal'}</TooltipContent>
+                          </Tooltip>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => copyKey(c.apiKey)}>
+                                <Copy className="h-3 w-3" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Copy</TooltipContent>
+                          </Tooltip>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-6 w-6 text-amber-600 hover:text-amber-700" onClick={() => regenerateKey(c)}>
+                                <RotateCw className="h-3 w-3" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Regenerate</TooltipContent>
+                          </Tooltip>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right pr-4">
+                        <div className="flex items-center justify-end gap-1">
+                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setEditing(c)}>
+                            <Pencil className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => setDeleting(c)}>
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  )
+                })}
+              </TableBody>
+            </Table>
+            {filteredItems.length === 0 && (
+              <div className="py-16 text-center text-muted-foreground">
+                <Building2 className="h-8 w-8 mx-auto mb-3 opacity-50" />
+                {statusFilter !== 'All' ? `No companies with status "${statusFilter}".` : 'No companies yet.'}
+              </div>
+            )}
+          </CardContent>
+        </Card>
       )}
 
       {/* Create dialog */}

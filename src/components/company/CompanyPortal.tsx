@@ -11,8 +11,9 @@ import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
+import { Separator } from '@/components/ui/separator'
 import { useToast } from '@/hooks/use-toast'
-import { Building2, LogOut, Loader2, RefreshCw, Pencil, Trash2, Plus, Users, DollarSign, ShieldCheck, Copy, KeyRound, Columns3, Calendar, MapPin } from 'lucide-react'
+import { Building2, LogOut, Loader2, RefreshCw, Pencil, Trash2, Plus, Users, DollarSign, ShieldCheck, Copy, KeyRound, Columns3, Calendar, MapPin, Info, UserRound, BarChart3, TrendingUp, FileText } from 'lucide-react'
 
 interface CustomColumn {
   id: string
@@ -80,6 +81,12 @@ const STATUS_STYLES: Record<string, string> = {
   Discontinued: 'bg-rose-50 text-rose-700 border-rose-200',
 }
 
+const GENDER_BORDER: Record<string, string> = {
+  Male: 'border-l-emerald-500',
+  Female: 'border-l-pink-500',
+  Other: 'border-l-violet-500',
+}
+
 export default function CompanyPortal({ company, onLogout }: { company: any; onLogout: () => void }) {
   const [tab, setTab] = useState<Tab>('profile')
   const [data, setData] = useState<CompanyFull | null>(null)
@@ -105,18 +112,35 @@ export default function CompanyPortal({ company, onLogout }: { company: any; onL
     load()
   }, [load])
 
+  const statusBadge = data?.status ? (
+    <Badge variant="outline" className={`text-xs font-medium ${STATUS_STYLES[data.status] || ''}`}>
+      {data.status === 'Active' && <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-500 mr-1.5" />}
+      {data.status === 'Inactive' && <span className="inline-block h-1.5 w-1.5 rounded-full bg-amber-500 mr-1.5" />}
+      {data.status === 'Discontinued' && <span className="inline-block h-1.5 w-1.5 rounded-full bg-rose-500 mr-1.5" />}
+      {data.status}
+    </Badge>
+  ) : null
+
+  const partialKey = data?.apiKey ? `${data.apiKey.slice(0, 10)}${'•'.repeat(8)}` : ''
+
   return (
     <div className="min-h-screen flex flex-col bg-muted/20">
-      {/* Header */}
-      <header className="border-b bg-background sticky top-0 z-10">
+      {/* Professional Header Bar */}
+      <header className="border-b bg-background sticky top-0 z-10 shadow-sm">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="h-9 w-9 rounded-lg bg-primary text-primary-foreground grid place-items-center font-bold">
+            <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white grid place-items-center font-bold text-sm shadow-md">
               {company.name.charAt(0).toUpperCase()}
             </div>
             <div className="leading-tight">
-              <div className="font-semibold text-sm truncate max-w-[200px] sm:max-w-xs">{company.name}</div>
-              <div className="text-xs text-muted-foreground">Company Portal</div>
+              <div className="flex items-center gap-2">
+                <span className="font-semibold text-sm truncate max-w-[180px] sm:max-w-xs">{data?.name || company.name}</span>
+                {statusBadge}
+              </div>
+              <div className="flex items-center gap-1.5 mt-0.5">
+                <KeyRound className="h-3 w-3 text-muted-foreground" />
+                <code className="text-[11px] font-mono text-muted-foreground">{partialKey}</code>
+              </div>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -185,6 +209,77 @@ function TabBtn({ active, onClick, icon, children }: { active: boolean; onClick:
 }
 
 // =================================================================
+// QUICK STATS CARD
+// =================================================================
+function QuickStats({ company }: { company: CompanyFull }) {
+  const latestAnnual = company.annualData.length > 0
+    ? company.annualData.reduce((a, b) => (a.year > b.year ? a : b))
+    : null
+
+  const stats = [
+    {
+      label: 'Total Founders',
+      value: company.founders.length,
+      icon: <UserRound className="h-4 w-4" />,
+      color: 'from-emerald-500 to-emerald-600',
+      textColor: 'text-emerald-700',
+      bgLight: 'bg-emerald-50',
+    },
+    {
+      label: 'Annual Records',
+      value: company.annualData.length,
+      icon: <BarChart3 className="h-4 w-4" />,
+      color: 'from-amber-500 to-amber-600',
+      textColor: 'text-amber-700',
+      bgLight: 'bg-amber-50',
+    },
+    {
+      label: 'Latest Revenue',
+      value: latestAnnual ? formatCurrency(latestAnnual.totalRevenue) : '—',
+      icon: <TrendingUp className="h-4 w-4" />,
+      color: 'from-violet-500 to-violet-600',
+      textColor: 'text-violet-700',
+      bgLight: 'bg-violet-50',
+    },
+  ]
+
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      {stats.map((s) => (
+        <div key={s.label} className={`relative overflow-hidden rounded-xl border bg-background p-4`+
+          ` transition-shadow hover:shadow-md`}>
+          <div className="flex items-center gap-3">
+            <div className={`h-10 w-10 rounded-lg bg-gradient-to-br ${s.color} text-white grid place-items-center shadow-sm`}>
+              {s.icon}
+            </div>
+            <div className="min-w-0">
+              <div className="text-xs text-muted-foreground font-medium">{s.label}</div>
+              <div className={`text-lg font-bold ${s.textColor} truncate`}>{s.value}</div>
+            </div>
+          </div>
+          <div className={`absolute -right-3 -bottom-3 h-16 w-16 rounded-full ${s.bgLight} opacity-50`} />
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// =================================================================
+// EMPTY STATE
+// =================================================================
+function EmptyState({ icon, title, description }: { icon: React.ReactNode; title: string; description: string }) {
+  return (
+    <div className="flex flex-col items-center justify-center py-14 text-center">
+      <div className="h-14 w-14 rounded-2xl bg-muted/60 grid place-items-center mb-4 text-muted-foreground/60">
+        {icon}
+      </div>
+      <h3 className="text-sm font-semibold text-foreground mb-1">{title}</h3>
+      <p className="text-xs text-muted-foreground max-w-[260px]">{description}</p>
+    </div>
+  )
+}
+
+// =================================================================
 // PROFILE TAB
 // =================================================================
 function ProfileTab({ company, customColumns, onChanged, revealed, setRevealed }: { company: CompanyFull; customColumns: CustomColumn[]; onChanged: () => void; revealed: boolean; setRevealed: (b: boolean) => void }) {
@@ -223,7 +318,7 @@ function ProfileTab({ company, customColumns, onChanged, revealed, setRevealed }
   }
 
   const saveCustomValues = async () => {
- setSavingCustom(true)
+    setSavingCustom(true)
     try {
       await api('/api/company/self', { method: 'PUT', body: { customValues } })
       toast({ title: 'Saved', description: 'Custom fields updated' })
@@ -236,7 +331,10 @@ function ProfileTab({ company, customColumns, onChanged, revealed, setRevealed }
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
+      {/* Quick Stats */}
+      <QuickStats company={company} />
+
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Company profile</CardTitle>
@@ -347,66 +445,70 @@ function ProfileTab({ company, customColumns, onChanged, revealed, setRevealed }
         </CardContent>
       </Card>
 
-      {/* Custom columns card */}
+      {/* Custom columns card — dashed border with info icon */}
       {customColumns.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2"><Columns3 className="h-4 w-4" /> Custom fields</CardTitle>
-            <CardDescription>Additional fields defined by the SEECS admin. Fill these in to provide extra information about your company.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid sm:grid-cols-2 gap-3">
-              {customColumns.map((col) => (
-                <div key={col.id} className="space-y-1.5">
-                  <Label>{col.name}{col.required && <span className="text-destructive ml-1">*</span>}{col.description && <span className="text-xs text-muted-foreground ml-1.5">— {col.description}</span>}</Label>
-                  {col.columnType === 'number' ? (
-                    <Input
-                      type="number"
-                      value={customValues[col.id] || ''}
-                      onChange={(e) => setCustomValues((s) => ({ ...s, [col.id]: e.target.value }))}
-                      placeholder={col.required ? 'Required' : 'Optional'}
-                    />
-                  ) : col.columnType === 'date' ? (
-                    <Input
-                      type="date"
-                      value={customValues[col.id] || ''}
-                      onChange={(e) => setCustomValues((s) => ({ ...s, [col.id]: e.target.value }))}
-                    />
-                  ) : col.columnType === 'boolean' ? (
-                    <label className="flex items-center gap-2 h-9 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={customValues[col.id] === 'true' || customValues[col.id] === '1'}
-                        onChange={(e) => setCustomValues((s) => ({ ...s, [col.id]: e.target.checked ? 'true' : 'false' }))}
-                        className="accent-primary"
-                      />
-                      <span className="text-sm">{customValues[col.id] === 'true' ? 'Yes' : 'No'}</span>
-                    </label>
-                  ) : col.columnType === 'url' ? (
-                    <Input
-                      type="url"
-                      value={customValues[col.id] || ''}
-                      onChange={(e) => setCustomValues((s) => ({ ...s, [col.id]: e.target.value }))}
-                      placeholder="https://…"
-                    />
-                  ) : (
-                    <Input
-                      value={customValues[col.id] || ''}
-                      onChange={(e) => setCustomValues((s) => ({ ...s, [col.id]: e.target.value }))}
-                      placeholder={col.required ? 'Required' : 'Optional'}
-                    />
-                  )}
-                </div>
-              ))}
+        <div className="rounded-xl border-2 border-dashed border-muted-foreground/25 bg-muted/20 p-5">
+          <div className="flex items-center gap-2 mb-1">
+            <Columns3 className="h-4 w-4 text-muted-foreground" />
+            <h3 className="text-base font-semibold">Custom fields</h3>
+            <div className="ml-auto">
+              <Info className="h-4 w-4 text-muted-foreground" />
             </div>
-            <div className="flex justify-end">
-              <Button onClick={saveCustomValues} disabled={savingCustom}>
-                {savingCustom && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                Save custom fields
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+          </div>
+          <p className="text-xs text-muted-foreground mb-4">
+            Additional fields defined by the SEECS admin. Fill these in to provide extra information about your company.
+          </p>
+          <div className="grid sm:grid-cols-2 gap-3">
+            {customColumns.map((col) => (
+              <div key={col.id} className="space-y-1.5">
+                <Label>{col.name}{col.required && <span className="text-destructive ml-1">*</span>}{col.description && <span className="text-xs text-muted-foreground ml-1.5">— {col.description}</span>}</Label>
+                {col.columnType === 'number' ? (
+                  <Input
+                    type="number"
+                    value={customValues[col.id] || ''}
+                    onChange={(e) => setCustomValues((s) => ({ ...s, [col.id]: e.target.value }))}
+                    placeholder={col.required ? 'Required' : 'Optional'}
+                  />
+                ) : col.columnType === 'date' ? (
+                  <Input
+                    type="date"
+                    value={customValues[col.id] || ''}
+                    onChange={(e) => setCustomValues((s) => ({ ...s, [col.id]: e.target.value }))}
+                  />
+                ) : col.columnType === 'boolean' ? (
+                  <label className="flex items-center gap-2 h-9 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={customValues[col.id] === 'true' || customValues[col.id] === '1'}
+                      onChange={(e) => setCustomValues((s) => ({ ...s, [col.id]: e.target.checked ? 'true' : 'false' }))}
+                      className="accent-primary"
+                    />
+                    <span className="text-sm">{customValues[col.id] === 'true' ? 'Yes' : 'No'}</span>
+                  </label>
+                ) : col.columnType === 'url' ? (
+                  <Input
+                    type="url"
+                    value={customValues[col.id] || ''}
+                    onChange={(e) => setCustomValues((s) => ({ ...s, [col.id]: e.target.value }))}
+                    placeholder="https://…"
+                  />
+                ) : (
+                  <Input
+                    value={customValues[col.id] || ''}
+                    onChange={(e) => setCustomValues((s) => ({ ...s, [col.id]: e.target.value }))}
+                    placeholder={col.required ? 'Required' : 'Optional'}
+                  />
+                )}
+              </div>
+            ))}
+          </div>
+          <div className="flex justify-end mt-4">
+            <Button onClick={saveCustomValues} disabled={savingCustom}>
+              {savingCustom && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Save custom fields
+            </Button>
+          </div>
+        </div>
       )}
 
       {/* API key card */}
@@ -418,7 +520,7 @@ function ProfileTab({ company, customColumns, onChanged, revealed, setRevealed }
         <CardContent className="space-y-3">
           <div className="flex items-center gap-2">
             <code className="flex-1 text-xs font-mono bg-muted px-3 py-2.5 rounded break-all">
-              {revealed ? company.apiKey : `${company.apiKey.slice(0, 14)}••••••••••••••••`}
+              {revealed ? company.apiKey : `${company.apiKey.slice(0, 14)}${'•'.repeat(16)}`}
             </code>
             <Button variant="outline" size="sm" onClick={() => setRevealed(!revealed)}>
               {revealed ? 'Hide' : 'Reveal'}
@@ -482,29 +584,38 @@ function FoundersTab({ company, onChanged }: { company: CompanyFull; onChanged: 
         </CardHeader>
         <CardContent>
           {company.founders.length === 0 ? (
-            <div className="text-center py-10 text-muted-foreground text-sm">
-              <Users className="h-8 w-8 mx-auto mb-2 opacity-40" />
-              No founders yet. Add the people who lead {company.name}.
-            </div>
+            <EmptyState
+              icon={<Users className="h-7 w-7" />}
+              title="No founders yet"
+              description={`Add the people who lead ${company.name} to start building your team profile.`}
+            />
           ) : (
-            <div className="grid gap-2">
-              {company.founders.map((cf) => (
-                <div key={cf.id} className="flex items-center gap-3 p-3 border rounded-lg">
-                  <div className="h-9 w-9 rounded-full bg-muted grid place-items-center text-xs font-semibold">
-                    {cf.founder.firstName.charAt(0)}{cf.founder.lastName.charAt(0)}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="font-medium text-sm">{cf.founder.firstName} {cf.founder.lastName}</div>
-                    <div className="text-xs text-muted-foreground">
-                      {cf.founder.degree?.name || 'No degree'} · {cf.founder.email || cf.founder.phone || 'No contact'}
+            <div className="grid gap-3">
+              {company.founders.map((cf) => {
+                const borderClass = GENDER_BORDER[cf.founder.gender] || 'border-l-gray-400'
+                const avatarGradient = cf.founder.gender === 'Female'
+                  ? 'from-pink-400 to-rose-500'
+                  : cf.founder.gender === 'Other'
+                    ? 'from-violet-400 to-purple-500'
+                    : 'from-emerald-400 to-teal-500'
+                return (
+                  <div key={cf.id} className={`flex items-center gap-3 p-3.5 border rounded-lg border-l-4 ${borderClass} transition-shadow hover:shadow-sm`}>
+                    <div className={`h-10 w-10 rounded-full bg-gradient-to-br ${avatarGradient} text-white grid place-items-center text-xs font-bold shadow-sm`}>
+                      {cf.founder.firstName.charAt(0)}{cf.founder.lastName.charAt(0)}
                     </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="font-medium text-sm">{cf.founder.firstName} {cf.founder.lastName}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {cf.founder.degree?.name || 'No degree'} · {cf.founder.email || cf.founder.phone || 'No contact'}
+                      </div>
+                    </div>
+                    <Badge variant="outline" className="shrink-0">{cf.role}</Badge>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive shrink-0" onClick={() => setDeleting(cf.founder.id)}>
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
                   </div>
-                  <Badge variant="outline">{cf.role}</Badge>
-                  <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => setDeleting(cf.founder.id)}>
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              ))}
+                )
+              })}
             </div>
           )}
         </CardContent>
@@ -693,32 +804,40 @@ function AnnualTab({ company, onChanged }: { company: CompanyFull; onChanged: ()
         </CardHeader>
         <CardContent>
           {company.annualData.length === 0 ? (
-            <div className="text-center py-10 text-muted-foreground text-sm">
-              <DollarSign className="h-8 w-8 mx-auto mb-2 opacity-40" />
-              No annual data yet. Add your first year of financial performance.
-            </div>
+            <EmptyState
+              icon={<FileText className="h-7 w-7" />}
+              title="No annual data yet"
+              description="Add your first year of financial performance to track revenue and growth over time."
+            />
           ) : (
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto rounded-lg border">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="text-left text-xs uppercase tracking-wider text-muted-foreground border-b">
-                    <th className="py-2 pr-4 font-medium">Year</th>
-                    <th className="py-2 pr-4 font-medium">Monthly rev.</th>
-                    <th className="py-2 pr-4 font-medium">Total rev.</th>
-                    <th className="py-2 pr-4 font-medium">Employees</th>
-                    <th className="py-2 pr-4 font-medium">Projects</th>
-                    <th className="py-2 font-medium text-right">Actions</th>
+                  <tr className="bg-muted/50 text-left text-xs uppercase tracking-wider text-muted-foreground">
+                    <th className="py-3 px-4 font-semibold">Year</th>
+                    <th className="py-3 px-4 font-semibold">Monthly Rev.</th>
+                    <th className="py-3 px-4 font-semibold">Total Rev.</th>
+                    <th className="py-3 px-4 font-semibold">Employees</th>
+                    <th className="py-3 px-4 font-semibold">Projects</th>
+                    <th className="py-3 px-4 font-semibold text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {company.annualData.map((r) => (
-                    <tr key={r.id} className="border-b last:border-0 hover:bg-muted/40">
-                      <td className="py-2.5 pr-4 font-medium">{r.year}</td>
-                      <td className="py-2.5 pr-4">{formatCurrency(r.monthlyRevenue)}</td>
-                      <td className="py-2.5 pr-4">{formatCurrency(r.totalRevenue)}</td>
-                      <td className="py-2.5 pr-4">{r.employeeCount}</td>
-                      <td className="py-2.5 pr-4">{r.projectCount}</td>
-                      <td className="py-2.5 text-right">
+                  {company.annualData.map((r, i) => (
+                    <tr
+                      key={r.id}
+                      className={`border-t transition-colors ${
+                        i % 2 === 0
+                          ? 'bg-background hover:bg-emerald-50/50'
+                          : 'bg-muted/30 hover:bg-emerald-50/50'
+                      }`}
+                    >
+                      <td className="py-3 px-4 font-semibold">{r.year}</td>
+                      <td className="py-3 px-4 tabular-nums">{formatCurrency(r.monthlyRevenue)}</td>
+                      <td className="py-3 px-4 tabular-nums font-medium">{formatCurrency(r.totalRevenue)}</td>
+                      <td className="py-3 px-4 tabular-nums">{r.employeeCount}</td>
+                      <td className="py-3 px-4 tabular-nums">{r.projectCount}</td>
+                      <td className="py-3 px-4 text-right">
                         <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setEditing(r)}>
                           <Pencil className="h-3.5 w-3.5" />
                         </Button>

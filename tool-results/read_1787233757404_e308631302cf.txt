@@ -1,0 +1,696 @@
+     1→     1→'use client'
+     2→     2→
+     3→     3→import { useEffect, useState } from 'react'
+     4→     4→import { api, formatDate, formatCurrency } from '@/lib/client-utils'
+     5→     5→import { Button } from '@/components/ui/button'
+     6→     6→import { Card, CardContent } from '@/components/ui/card'
+     7→     7→import { Input } from '@/components/ui/input'
+     8→     8→import { Label } from '@/components/ui/label'
+     9→     9→import { Textarea } from '@/components/ui/textarea'
+    10→    10→import { Badge } from '@/components/ui/badge'
+    11→    11→import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+    12→    12→import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+    13→    13→import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
+    14→    14→import { useToast } from '@/hooks/use-toast'
+    15→    15→import { Building2, Loader2, Plus, RefreshCw, Search, KeyRound, Pencil, Trash2, Copy, Eye, EyeOff, Columns3, ChevronDown, ChevronUp } from 'lucide-react'
+    16→    16→
+    17→    17→interface CustomColumn {
+    18→    18→  id: string
+    19→    19→  name: string
+    20→    20→  slug: string
+    21→    21→  columnType: string
+    22→    22→  targetTable: string
+    23→    23→  description: string | null
+    24→    24→  required: boolean
+    25→    25→  sortOrder: number
+    26→    26→}
+    27→    27→
+    28→    28→interface CustomValue {
+    29→    29→  id: string
+    30→    30→  customColumnId: string
+    31→    31→  value: string
+    32→    32→  customColumn: CustomColumn
+    33→    33→}
+    34→    34→
+    35→    35→interface Company {
+    36→    36→  id: string
+    37→    37→  name: string
+    38→    38→  description: string | null
+    39→    39→  email: string | null
+    40→    40→  phone: string | null
+    41→    41→  website: string | null
+    42→    42→  apiKey: string
+    43→    43→  apiKeyActive: boolean
+    44→    44→  sectorId: string
+    45→    45→  cityId: string
+    46→    46→  locationId: string | null
+    47→    47→  registeredAt: string
+    48→    48→  // New Java fields
+    49→    49→  status: string | null
+    50→    50→  statusReason: string | null
+    51→    51→  sinceDate: string | null
+    52→    52→  foundedYear: number | null
+    53→    53→  discontinuedDate: string | null
+    54→    54→  branchesCount: number | null
+    55→    55→  revenue: number | null
+    56→    56→  revenueMin: number | null
+    57→    57→  revenueMax: number | null
+    58→    58→  // Relations
+    59→    59→  sector: { id: string; name: string }
+    60→    60→  city: { id: string; name: string }
+    61→    61→  location: { id: string; address: string; country: string; city: { name: string } } | null
+    62→    62→  founders: { id: string; role: string; founder: { id: string; firstName: string; lastName: string } }[]
+    63→    63→  _count: { annualData: number }
+    64→    64→  customValues: CustomValue[]
+    65→    65→}
+    66→    66→
+    67→    67→interface Lookup {
+    68→    68→  sectors: { id: string; name: string }[]
+    69→    69→  cities: { id: string; name: string }[]
+    70→    70→  locations: { id: string; address: string; city: { name: string } }[]
+    71→    71→  degrees: { id: string; name: string; field: string | null }[]
+    72→    72→  founders: { id: string; firstName: string; lastName: string; gender: string }[]
+    73→    73→}
+    74→    74→
+    75→    75→const STATUS_STYLES: Record<string, string> = {
+    76→    76→  Active: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+    77→    77→  Inactive: 'bg-amber-50 text-amber-700 border-amber-200',
+    78→    78→  Discontinued: 'bg-rose-50 text-rose-700 border-rose-200',
+    79→    79→}
+    80→    80→
+    81→    81→export default function CompaniesPage() {
+    82→    82→  const [items, setItems] = useState<Company[]>([])
+    83→    83→  const [customColumns, setCustomColumns] = useState<CustomColumn[]>([])
+    84→    84→  const [lookup, setLookup] = useState<Lookup | null>(null)
+    85→    85→  const [loading, setLoading] = useState(true)
+    86→    86→  const [search, setSearch] = useState('')
+    87→    87→  const [editing, setEditing] = useState<Company | null>(null)
+    88→    88→  const [creating, setCreating] = useState(false)
+    89→    89→  const [deleting, setDeleting] = useState<Company | null>(null)
+    90→    90→  const [revealedKeys, setRevealedKeys] = useState<Record<string, boolean>>({})
+    91→    91→  const [showCustom, setShowCustom] = useState<Record<string, boolean>>({})
+    92→    92→  const { toast } = useToast()
+    93→    93→
+    94→    94→  const load = async () => {
+    95→    95→    setLoading(true)
+    96→    96→    try {
+    97→    97→      const [companiesRes, lookupRes] = await Promise.all([
+    98→    98→        api<{ items: Company[]; customColumns: CustomColumn[] }>(`/api/admin/companies?q=${encodeURIComponent(search)}`),
+    99→    99→        api<Lookup>('/api/lookup'),
+   100→   100→      ])
+   101→   101→      setItems(companiesRes.items)
+   102→   102→      setCustomColumns(companiesRes.customColumns)
+   103→   103→      setLookup(lookupRes)
+   104→   104→    } catch (e: any) {
+   105→   105→      toast({ title: 'Error', description: e.message, variant: 'destructive' })
+   106→   106→    } finally {
+   107→   107→      setLoading(false)
+   108→   108→    }
+   109→   109→  }
+   110→   110→
+   111→   111→  useEffect(() => {
+   112→   112→    const t = setTimeout(load, 250)
+   113→   113→    return () => clearTimeout(t)
+   114→   114→  }, [search])
+   115→   115→
+   116→   116→  const copyKey = (k: string) => {
+   117→   117→    navigator.clipboard?.writeText(k)
+   118→   118→    toast({ title: 'Copied', description: 'API key copied to clipboard' })
+   119→   119→  }
+   120→   120→
+   121→   121→  const getCustomValue = (company: Company, columnId: string) => {
+   122→   122→    return company.customValues?.find((cv) => cv.customColumnId === columnId)?.value || ''
+   123→   123→  }
+   124→   124→
+   125→   125→  return (
+   126→   126→    <div className="p-4 sm:p-6 space-y-4 max-w-7xl mx-auto">
+   127→   127→      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+   128→   128→        <div>
+   129→   129→          <h1 className="text-2xl font-semibold">Companies</h1>
+   130→   130→          <p className="text-sm text-muted-foreground">{items.length} registered · master list with per-company API keys.</p>
+   131→   131→        </div>
+   132→   132→        <div className="flex gap-2">
+   133→   133→          <Button variant="outline" size="sm" onClick={load} disabled={loading}>
+   134→   134→            {loading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-2" />}
+   135→   135→            Refresh
+   136→   136→          </Button>
+   137→   137→          <Button size="sm" onClick={() => setCreating(true)}>
+   138→   138→            <Plus className="h-4 w-4 mr-2" /> Add company
+   139→   139→          </Button>
+   140→   140→        </div>
+   141→   141→      </div>
+   142→   142→
+   143→   143→      <div className="relative max-w-sm">
+   144→   144→        <Search className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+   145→   145→        <Input
+   146→   146→          placeholder="Search by name…"
+   147→   147→          value={search}
+   148→   148→          onChange={(e) => setSearch(e.target.value)}
+   149→   149→          className="pl-9"
+   150→   150→        />
+   151→   151→      </div>
+   152→   152→
+   153→   153→      {loading && items.length === 0 ? (
+   154→   154→        <div className="py-12 text-center text-muted-foreground text-sm"><Loader2 className="h-5 w-5 animate-spin inline mr-2" />Loading…</div>
+   155→   155→      ) : (
+   156→   156→        <div className="grid gap-3">
+   157→   157→          {items.map((c) => {
+   158→   158→            const revealed = revealedKeys[c.id]
+   159→   159→            const showCust = showCustom[c.id]
+   160→   160→            return (
+   161→   161→              <Card key={c.id} className="overflow-hidden">
+   162→   162→                <CardContent className="p-4 sm:p-5">
+   163→   163→                  <div className="flex flex-col lg:flex-row gap-4">
+   164→   164→                    {/* Left: identity */}
+   165→   165→                    <div className="flex-1 min-w-0">
+   166→   166→                      <div className="flex items-start justify-between gap-3">
+   167→   167→                        <div className="min-w-0">
+   168→   168→                          <div className="flex items-center gap-2 flex-wrap">
+   169→   169→                            <h3 className="font-semibold truncate">{c.name}</h3>
+   170→   170→                            {c.status ? (
+   171→   171→                              <Badge variant="outline" className={`text-xs ${STATUS_STYLES[c.status] || ''}`}>{c.status}</Badge>
+   172→   172→                            ) : c.apiKeyActive ? (
+   173→   173→                              <Badge variant="secondary" className="text-emerald-600 bg-emerald-50 border-emerald-200">Active</Badge>
+   174→   174→                            ) : (
+   175→   175→                              <Badge variant="destructive" className="bg-rose-50 text-rose-700 border-rose-200">Revoked</Badge>
+   176→   176→                            )}
+   177→   177→                          </div>
+   178→   178→                          <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{c.description || 'No description.'}</p>
+   179→   179→                        </div>
+   180→   180→                      </div>
+   181→   181→
+   182→   182→                      <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
+   183→   183→                        <Field label="Sector" value={c.sector.name} />
+   184→   184→                        <Field label="City" value={c.city.name} />
+   185→   185→                        <Field label="Founders" value={String(c.founders.length)} />
+   186→   186→                        <Field label="Annual records" value={String(c._count.annualData)} />
+   187→   187→                      </div>
+   188→   188→
+   189→   189→                      {/* New fields row */}
+   190→   190→                      {(c.foundedYear || c.sinceDate || c.branchesCount || c.revenue != null || c.revenueMin != null) && (
+   191→   191→                        <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
+   192→   192→                          {c.foundedYear && <Field label="Founded" value={String(c.foundedYear)} />}
+   193→   193→                          {c.sinceDate && <Field label="Since" value={c.sinceDate} />}
+   194→   194→                          {c.branchesCount != null && <Field label="Branches" value={String(c.branchesCount)} />}
+   195→   195→                          {c.revenue != null ? (
+   196→   196→                            <Field label="Revenue" value={formatCurrency(c.revenue)} />
+   197→   197→                          ) : c.revenueMin != null || c.revenueMax != null ? (
+   198→   198→                            <Field label="Revenue range" value={`${formatCurrency(c.revenueMin || 0)} – ${formatCurrency(c.revenueMax || 0)}`} />
+   199→   199→                          ) : null}
+   200→   200→                        </div>
+   201→   201→                      )}
+   202→   202→
+   203→   203→                      {c.statusReason && (
+   204→   204→                        <p className="mt-2 text-xs text-muted-foreground">Status reason: {c.statusReason}</p>
+   205→   205→                      )}
+   206→   206→                      {c.discontinuedDate && (
+   207→   207→                        <p className="mt-1 text-xs text-rose-600">Discontinued: {c.discontinuedDate}</p>
+   208→   208→                      )}
+   209→   209→
+   210→   210→                      {c.founders.length > 0 && (
+   211→   211→                        <div className="mt-3 flex flex-wrap gap-1.5">
+   212→   212→                          {c.founders.map((cf) => (
+   213→   213→                            <Badge key={cf.id} variant="outline" className="text-xs">
+   214→   214→                              {cf.founder.firstName} {cf.founder.lastName} · <span className="text-muted-foreground">{cf.role}</span>
+   215→   215→                            </Badge>
+   216→   216→                          ))}
+   217→   217→                        </div>
+   218→   218→                      )}
+   219→   219→
+   220→   220→                      {/* Custom columns inline */}
+   221→   221→                      {customColumns.length > 0 && (
+   222→   222→                        <div className="mt-3">
+   223→   223→                          <button
+   224→   224→                            className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
+   225→   225→                            onClick={() => setShowCustom((s) => ({ ...s, [c.id]: !s[c.id] }))}
+   226→   226→                          >
+   227→   227→                            <Columns3 className="h-3.5 w-3.5" />
+   228→   228→                            Custom fields ({customColumns.length})
+   229→   229→                            {showCust ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+   230→   230→                          </button>
+   231→   231→                          {showCust && (
+   232→   232→                            <div className="mt-2 grid grid-cols-2 sm:grid-cols-3 gap-2">
+   233→   233→                              {customColumns.map((col) => (
+   234→   234→                                <div key={col.id} className="text-sm">
+   235→   235→                                  <span className="text-xs text-muted-foreground">{col.name}</span>
+   236→   236→                                  <div className="font-medium truncate">{getCustomValue(c, col.id) || <span className="text-muted-foreground italic">—</span>}</div>
+   237→   237→                                </div>
+   238→   238→                              ))}
+   239→   239→                            </div>
+   240→   240→                          )}
+   241→   241→                        </div>
+   242→   242→                      )}
+   243→   243→                    </div>
+   244→   244→
+   245→   245→                    {/* Right: API key + actions */}
+   246→   246→                    <div className="lg:w-80 lg:border-l lg:pl-5 space-y-2">
+   247→   247→                      <div>
+   248→   248→                        <Label className="text-xs text-muted-foreground">API Key</Label>
+   249→   249→                        <div className="flex items-center gap-1 mt-1">
+   250→   250→                          <code className="text-xs font-mono bg-muted px-2 py-1 rounded flex-1 truncate">
+   251→   251→                            {revealed ? c.apiKey : `${c.apiKey.slice(0, 14)}••••••••`}
+   252→   252→                          </code>
+   253→   253→                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setRevealedKeys((s) => ({ ...s, [c.id]: !s[c.id] }))}>
+   254→   254→                            {revealed ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+   255→   255→                          </Button>
+   256→   256→                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => copyKey(c.apiKey)}>
+   257→   257→                            <Copy className="h-3.5 w-3.5" />
+   258→   258→                          </Button>
+   259→   259→                        </div>
+   260→   260→                      </div>
+   261→   261→                      <div className="flex gap-2">
+   262→   262→                        <Button variant="outline" size="sm" className="flex-1" onClick={() => setEditing(c)}>
+   263→   263→                          <Pencil className="h-3.5 w-3.5 mr-1" /> Edit
+   264→   264→                        </Button>
+   265→   265→                        <Button variant="outline" size="sm" className="text-destructive hover:bg-destructive/5" onClick={() => setDeleting(c)}>
+   266→   266→                          <Trash2 className="h-3.5 w-3.5" />
+   267→   267→                        </Button>
+   268→   268→                      </div>
+   269→   269→                    </div>
+   270→   270→                  </div>
+   271→   271→                </CardContent>
+   272→   272→              </Card>
+   273→   273→            )
+   274→   274→          })}
+   275→   275→          {items.length === 0 && (
+   276→   276→            <div className="py-16 text-center text-muted-foreground">
+   277→   277→              <Building2 className="h-8 w-8 mx-auto mb-3 opacity-50" />
+   278→   278→              No companies yet. Add one or let companies self-register.
+   279→   279→            </div>
+   280→   280→          )}
+   281→   281→        </div>
+   282→   282→      )}
+   283→   283→
+   284→   284→      {/* Create dialog */}
+   285→   285→      <CompanyFormDialog
+   286→   286→        open={creating}
+   287→   287→        onOpenChange={setCreating}
+   288→   288→        lookup={lookup}
+   289→   289→        customColumns={customColumns}
+   290→   290→        onSaved={() => { setCreating(false); load() }}
+   291→   291→      />
+   292→   292→      {/* Edit dialog */}
+   293→   293→      <CompanyFormDialog
+   294→   294→        open={!!editing}
+   295→   295→        onOpenChange={(o) => !o && setEditing(null)}
+   296→   296→        company={editing}
+   297→   297→        lookup={lookup}
+   298→   298→        customColumns={customColumns}
+   299→   299→        onSaved={() => { setEditing(null); load() }}
+   300→   300→      />
+   301→   301→      {/* Delete confirm */}
+   302→   302→      <AlertDialog open={!!deleting} onOpenChange={(o) => !o && setDeleting(null)}>
+   303→   303→        <AlertDialogContent>
+   304→   304→          <AlertDialogHeader>
+   305→   305→            <AlertDialogTitle>Delete company "{deleting?.name}"?</AlertDialogTitle>
+   306→   306→            <AlertDialogDescription>
+   307→   307→              This permanently removes the company, its founder attachments and all annual data. This cannot be undone.
+   308→   308→            </AlertDialogDescription>
+   309→   309→          </AlertDialogHeader>
+   310→   310→          <AlertDialogFooter>
+   311→   311→            <AlertDialogCancel>Cancel</AlertDialogCancel>
+   312→   312→            <AlertDialogAction
+   313→   313→              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+   314→   314→              onClick={async () => {
+   315→   315→                try {
+   316→   316→                  await api(`/api/admin/companies/${deleting!.id}`, { method: 'DELETE' })
+   317→   317→                  toast({ title: 'Deleted', description: `${deleting!.name} removed` })
+   318→   318→                  setDeleting(null)
+   319→   319→                  load()
+   320→   320→                } catch (e: any) {
+   321→   321→                  toast({ title: 'Error', description: e.message, variant: 'destructive' })
+   322→   322→                }
+   323→   323→              }}
+   324→   324→            >
+   325→   325→              Delete
+   326→   326→            </AlertDialogAction>
+   327→   327→          </AlertDialogFooter>
+   328→   328→        </AlertDialogContent>
+   329→   329→      </AlertDialog>
+   330→   330→    </div>
+   331→   331→  )
+   332→   332→}
+   333→   333→
+   334→   334→function Field({ label, value }: { label: string; value: React.ReactNode }) {
+   335→   335→  return (
+   336→   336→    <div>
+   337→   337→      <div className="text-xs text-muted-foreground">{label}</div>
+   338→   338→      <div className="font-medium truncate">{value}</div>
+   339→   339→    </div>
+   340→   340→  )
+   341→   341→}
+   342→   342→
+   343→   343→function CompanyFormDialog({
+   344→   344→  open,
+   345→   345→  onOpenChange,
+   346→   346→  company,
+   347→   347→  lookup,
+   348→   348→  customColumns,
+   349→   349→  onSaved,
+   350→   350→}: {
+   351→   351→  open: boolean
+   352→   352→  onOpenChange: (o: boolean) => void
+   353→   353→  company?: Company | null
+   354→   354→  lookup: Lookup | null
+   355→   355→  customColumns: CustomColumn[]
+   356→   356→  onSaved: () => void
+   357→   357→}) {
+   358→   358→  const [name, setName] = useState('')
+   359→   359→  const [description, setDescription] = useState('')
+   360→   360→  const [email, setEmail] = useState('')
+   361→   361→  const [phone, setPhone] = useState('')
+   362→   362→  const [website, setWebsite] = useState('')
+   363→   363→  const [sectorId, setSectorId] = useState('')
+   364→   364→  const [cityId, setCityId] = useState('')
+   365→   365→  const [locationId, setLocationId] = useState('')
+   366→   366→  const [founderIds, setFounderIds] = useState<string[]>([])
+   367→   367→  const [apiKeyActive, setApiKeyActive] = useState(true)
+   368→   368→  const [regenerateKey, setRegenerateKey] = useState(false)
+   369→   369→  // New fields
+   370→   370→  const [status, setStatus] = useState('')
+   371→   371→  const [statusReason, setStatusReason] = useState('')
+   372→   372→  const [sinceDate, setSinceDate] = useState('')
+   373→   373→  const [foundedYear, setFoundedYear] = useState('')
+   374→   374→  const [discontinuedDate, setDiscontinuedDate] = useState('')
+   375→   375→  const [branchesCount, setBranchesCount] = useState('')
+   376→   376→  const [revenue, setRevenue] = useState('')
+   377→   377→  const [revenueMin, setRevenueMin] = useState('')
+   378→   378→  const [revenueMax, setRevenueMax] = useState('')
+   379→   379→  // Custom column values
+   380→   380→  const [customValues, setCustomValues] = useState<Record<string, string>>({})
+   381→   381→  const [saving, setSaving] = useState(false)
+   382→   382→  const { toast } = useToast()
+   383→   383→
+   384→   384→  useEffect(() => {
+   385→   385→    if (open) {
+   386→   386→      setName(company?.name || '')
+   387→   387→      setDescription(company?.description || '')
+   388→   388→      setEmail(company?.email || '')
+   389→   389→      setPhone(company?.phone || '')
+   390→   390→      setWebsite(company?.website || '')
+   391→   391→      setSectorId(company?.sectorId || '')
+   392→   392→      setCityId(company?.cityId || '')
+   393→   393→      setLocationId(company?.locationId || '')
+   394→   394→      setFounderIds(company?.founders.map((f) => f.founder.id) || [])
+   395→   395→      setApiKeyActive(company?.apiKeyActive ?? true)
+   396→   396→      setRegenerateKey(false)
+   397→   397→      // New fields
+   398→   398→      setStatus(company?.status || '')
+   399→   399→      setStatusReason(company?.statusReason || '')
+   400→   400→      setSinceDate(company?.sinceDate || '')
+   401→   401→      setFoundedYear(company?.foundedYear ? String(company.foundedYear) : '')
+   402→   402→      setDiscontinuedDate(company?.discontinuedDate || '')
+   403→   403→      setBranchesCount(company?.branchesCount != null ? String(company.branchesCount) : '')
+   404→   404→      setRevenue(company?.revenue != null ? String(company.revenue) : '')
+   405→   405→      setRevenueMin(company?.revenueMin != null ? String(company.revenueMin) : '')
+   406→   406→      setRevenueMax(company?.revenueMax != null ? String(company.revenueMax) : '')
+   407→   407→      // Custom values
+   408→   408→      const cvMap: Record<string, string> = {}
+   409→   409→      company?.customValues?.forEach((cv) => { cvMap[cv.customColumnId] = cv.value })
+   410→   410→      setCustomValues(cvMap)
+   411→   411→    }
+   412→   412→  }, [open, company])
+   413→   413→
+   414→   414→  const submit = async (e: React.FormEvent) => {
+   415→   415→    e.preventDefault()
+   416→   416→    if (!name || !sectorId || !cityId) {
+   417→   417→      toast({ title: 'Validation', description: 'Name, sector and city are required', variant: 'destructive' })
+   418→   418→      return
+   419→   419→    }
+   420→   420→    // Validate required custom columns
+   421→   421→    for (const col of customColumns) {
+   422→   422→      if (col.required && !customValues[col.id]?.trim()) {
+   423→   423→        toast({ title: 'Validation', description: `"${col.name}" is required`, variant: 'destructive' })
+   424→   424→        return
+   425→   425→      }
+   426→   426→    }
+   427→   427→    setSaving(true)
+   428→   428→    try {
+   429→   429→      const body: Record<string, unknown> = {
+   430→   430→        name, description, email, phone, website,
+   431→   431→        sectorId, cityId, locationId: locationId || null,
+   432→   432→        founderIds, apiKeyActive, regenerateKey,
+   433→   433→        // New fields
+   434→   434→        status: status || null,
+   435→   435→        statusReason: statusReason || null,
+   436→   436→        sinceDate: sinceDate || null,
+   437→   437→        foundedYear: foundedYear ? Number(foundedYear) : null,
+   438→   438→        discontinuedDate: discontinuedDate || null,
+   439→   439→        branchesCount: branchesCount ? Number(branchesCount) : null,
+   440→   440→        revenue: revenue ? Number(revenue) : null,
+   441→   441→        revenueMin: revenueMin ? Number(revenueMin) : null,
+   442→   442→        revenueMax: revenueMax ? Number(revenueMax) : null,
+   443→   443→      }
+   444→   444→      // Add custom values as a separate key
+   445→   445→      const cvPayload = customColumns.map((col) => ({
+   446→   446→        customColumnId: col.id,
+   447→   447→        value: customValues[col.id] || '',
+   448→   448→      }))
+   449→   449→      if (cvPayload.length > 0) {
+   450→   450→        body.customValues = cvPayload
+   451→   451→      }
+   452→   452→
+   453→   453→      if (company) {
+   454→   454→        await api(`/api/admin/companies/${company.id}`, { method: 'PUT', body })
+   455→   455→        toast({ title: 'Saved', description: 'Company updated' })
+   456→   456→      } else {
+   457→   457→        await api('/api/admin/companies', { method: 'POST', body })
+   458→   458→        toast({ title: 'Created', description: 'Company added' })
+   459→   459→      }
+   460→   460→      onSaved()
+   461→   461→    } catch (e: any) {
+   462→   462→      toast({ title: 'Error', description: e.message, variant: 'destructive' })
+   463→   463→    } finally {
+   464→   464→      setSaving(false)
+   465→   465→    }
+   466→   466→  }
+   467→   467→
+   468→   468→  return (
+   469→   469→    <Dialog open={open} onOpenChange={onOpenChange}>
+   470→   470→      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+   471→   471→        <DialogHeader>
+   472→   472→          <DialogTitle>{company ? 'Edit company' : 'New company'}</DialogTitle>
+   473→   473→          <DialogDescription>
+   474→   474→            {company ? 'Update the company profile and manage its API key.' : 'Add a new company to the registry. A unique API key is generated automatically.'}
+   475→   475→          </DialogDescription>
+   476→   476→        </DialogHeader>
+   477→   477→        <form onSubmit={submit} className="space-y-4">
+   478→   478→          {/* Basic info */}
+   479→   479→          <div className="grid sm:grid-cols-2 gap-3">
+   480→   480→            <div className="space-y-1.5 sm:col-span-2">
+   481→   481→              <Label>Company name *</Label>
+   482→   482→              <Input value={name} onChange={(e) => setName(e.target.value)} required />
+   483→   483→            </div>
+   484→   484→            <div className="space-y-1.5 sm:col-span-2">
+   485→   485→              <Label>Description</Label>
+   486→   486→              <Textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={2} />
+   487→   487→            </div>
+   488→   488→            <div className="space-y-1.5">
+   489→   489→              <Label>Email</Label>
+   490→   490→              <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+   491→   491→            </div>
+   492→   492→            <div className="space-y-1.5">
+   493→   493→              <Label>Phone</Label>
+   494→   494→              <Input value={phone} onChange={(e) => setPhone(e.target.value)} />
+   495→   495→            </div>
+   496→   496→            <div className="space-y-1.5 sm:col-span-2">
+   497→   497→              <Label>Website</Label>
+   498→   498→              <Input value={website} onChange={(e) => setWebsite(e.target.value)} placeholder="https://…" />
+   499→   499→            </div>
+   500→   500→          </div>
+   501→   501→
+   502→   502→          {/* Status & Lifecycle */}
+   503→   503→          <div className="border-t pt-4">
+   504→   504→            <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">Status & Lifecycle</div>
+   505→   505→            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+   506→   506→              <div className="space-y-1.5">
+   507→   507→                <Label>Status</Label>
+   508→   508→                <Select value={status} onValueChange={setStatus}>
+   509→   509→                  <SelectTrigger><SelectValue placeholder="Not set" /></SelectTrigger>
+   510→   510→                  <SelectContent>
+   511→   511→                    <SelectItem value="">Not set</SelectItem>
+   512→   512→                    <SelectItem value="Active">Active</SelectItem>
+   513→   513→                    <SelectItem value="Inactive">Inactive</SelectItem>
+   514→   514→                    <SelectItem value="Discontinued">Discontinued</SelectItem>
+   515→   515→                  </SelectContent>
+   516→   516→                </Select>
+   517→   517→              </div>
+   518→   518→              <div className="space-y-1.5">
+   519→   519→                <Label>Status reason</Label>
+   520→   520→                <Input value={statusReason} onChange={(e) => setStatusReason(e.target.value)} placeholder="Optional reason" />
+   521→   521→              </div>
+   522→   522→              <div className="space-y-1.5">
+   523→   523→                <Label>Founded year</Label>
+   524→   524→                <Input type="number" value={foundedYear} onChange={(e) => setFoundedYear(e.target.value)} placeholder="e.g. 2018" min="1950" max="2100" />
+   525→   525→              </div>
+   526→   526→              <div className="space-y-1.5">
+   527→   527→                <Label>Since date</Label>
+   528→   528→                <Input type="date" value={sinceDate} onChange={(e) => setSinceDate(e.target.value)} />
+   529→   529→              </div>
+   530→   530→              <div className="space-y-1.5">
+   531→   531→                <Label>Discontinued date</Label>
+   532→   532→                <Input type="date" value={discontinuedDate} onChange={(e) => setDiscontinuedDate(e.target.value)} />
+   533→   533→              </div>
+   534→   534→              <div className="space-y-1.5">
+   535→   535→                <Label>Branches count</Label>
+   536→   536→                <Input type="number" value={branchesCount} onChange={(e) => setBranchesCount(e.target.value)} placeholder="0" min="0" />
+   537→   537→              </div>
+   538→   538→            </div>
+   539→   539→          </div>
+   540→   540→
+   541→   541→          {/* Revenue */}
+   542→   542→          <div className="border-t pt-4">
+   543→   543→            <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">Revenue (PKR)</div>
+   544→   544→            <div className="grid sm:grid-cols-3 gap-3">
+   545→   545→              <div className="space-y-1.5">
+   546→   546→                <Label>Exact revenue</Label>
+   547→   547→                <Input type="number" value={revenue} onChange={(e) => setRevenue(e.target.value)} placeholder="Leave blank if using range" />
+   548→   548→              </div>
+   549→   549→              <div className="space-y-1.5">
+   550→   550→                <Label>Revenue min</Label>
+   551→   551→                <Input type="number" value={revenueMin} onChange={(e) => setRevenueMin(e.target.value)} placeholder="Min" />
+   552→   552→              </div>
+   553→   553→              <div className="space-y-1.5">
+   554→   554→                <Label>Revenue max</Label>
+   555→   555→                <Input type="number" value={revenueMax} onChange={(e) => setRevenueMax(e.target.value)} placeholder="Max" />
+   556→   556→              </div>
+   557→   557→            </div>
+   558→   558→          </div>
+   559→   559→
+   560→   560→          {/* Classification */}
+   561→   561→          <div className="border-t pt-4">
+   562→   562→            <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">Classification</div>
+   563→   563→            <div className="grid sm:grid-cols-2 gap-3">
+   564→   564→              <div className="space-y-1.5">
+   565→   565→                <Label>Sector *</Label>
+   566→   566→                <Select value={sectorId} onValueChange={setSectorId}>
+   567→   567→                  <SelectTrigger><SelectValue placeholder="Select sector" /></SelectTrigger>
+   568→   568→                  <SelectContent>
+   569→   569→                    {lookup?.sectors.map((s) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
+   570→   570→                  </SelectContent>
+   571→   571→                </Select>
+   572→   572→              </div>
+   573→   573→              <div className="space-y-1.5">
+   574→   574→                <Label>City *</Label>
+   575→   575→                <Select value={cityId} onValueChange={setCityId}>
+   576→   576→                  <SelectTrigger><SelectValue placeholder="Select city" /></SelectTrigger>
+   577→   577→                  <SelectContent>
+   578→   578→                    {lookup?.cities.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+   579→   579→                  </SelectContent>
+   580→   580→                </Select>
+   581→   581→              </div>
+   582→   582→              <div className="space-y-1.5 sm:col-span-2">
+   583→   583→                <Label>Location</Label>
+   584→   584→                <Select value={locationId} onValueChange={setLocationId}>
+   585→   585→                  <SelectTrigger><SelectValue placeholder="Optional" /></SelectTrigger>
+   586→   586→                  <SelectContent>
+   587→   587→                    {lookup?.locations.map((l) => <SelectItem key={l.id} value={l.id}>{l.address} · {l.city.name}</SelectItem>)}
+   588→   588→                  </SelectContent>
+   589→   589→                </Select>
+   590→   590→              </div>
+   591→   591→            </div>
+   592→   592→          </div>
+   593→   593→
+   594→   594→          {/* Founders */}
+   595→   595→          <div className="border-t pt-4">
+   596→   596→            <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">Founders</div>
+   597→   597→            <div className="border rounded-md p-3 max-h-40 overflow-y-auto space-y-2">
+   598→   598→              {lookup?.founders.length === 0 && <div className="text-xs text-muted-foreground">No founders registered yet.</div>}
+   599→   599→              {lookup?.founders.map((f) => (
+   600→   600→                <label key={f.id} className="flex items-center gap-2 text-sm cursor-pointer">
+   601→   601→                  <input
+   602→   602→                    type="checkbox"
+   603→   603→                    checked={founderIds.includes(f.id)}
+   604→   604→                    onChange={(e) => setFounderIds((s) => e.target.checked ? [...s, f.id] : s.filter((x) => x !== f.id))}
+   605→   605→                    className="accent-primary"
+   606→   606→                  />
+   607→   607→                  <span>{f.firstName} {f.lastName}</span>
+   608→   608→                  <Badge variant="outline" className="text-xs ml-auto">{f.gender}</Badge>
+   609→   609→                </label>
+   610→   610→              ))}
+   611→   611→            </div>
+   612→   612→          </div>
+   613→   613→
+   614→   614→          {/* Custom columns */}
+   615→   615→          {customColumns.length > 0 && (
+   616→   616→            <div className="border-t pt-4">
+   617→   617→              <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3 flex items-center gap-1.5">
+   618→   618→                <Columns3 className="h-3.5 w-3.5" /> Custom Fields
+   619→   619→              </div>
+   620→   620→              <div className="grid sm:grid-cols-2 gap-3">
+   621→   621→                {customColumns.map((col) => (
+   622→   622→                  <div key={col.id} className="space-y-1.5">
+   623→   623→                    <Label>{col.name}{col.required && <span className="text-destructive ml-1">*</span>}{col.description && <span className="text-xs text-muted-foreground ml-1.5">— {col.description}</span>}</Label>
+   624→   624→                    {col.columnType === 'number' ? (
+   625→   625→                      <Input
+   626→   626→                        type="number"
+   627→   627→                        value={customValues[col.id] || ''}
+   628→   628→                        onChange={(e) => setCustomValues((s) => ({ ...s, [col.id]: e.target.value }))}
+   629→   629→                        placeholder={col.required ? 'Required' : 'Optional'}
+   630→   630→                      />
+   631→   631→                    ) : col.columnType === 'date' ? (
+   632→   632→                      <Input
+   633→   633→                        type="date"
+   634→   634→                        value={customValues[col.id] || ''}
+   635→   635→                        onChange={(e) => setCustomValues((s) => ({ ...s, [col.id]: e.target.value }))}
+   636→   636→                      />
+   637→   637→                    ) : col.columnType === 'boolean' ? (
+   638→   638→                      <label className="flex items-center gap-2 h-9 cursor-pointer">
+   639→   639→                        <input
+   640→   640→                          type="checkbox"
+   641→   641→                          checked={customValues[col.id] === 'true' || customValues[col.id] === '1'}
+   642→   642→                          onChange={(e) => setCustomValues((s) => ({ ...s, [col.id]: e.target.checked ? 'true' : 'false' }))}
+   643→   643→                          className="accent-primary"
+   644→   644→                        />
+   645→   645→                        <span className="text-sm">{customValues[col.id] === 'true' ? 'Yes' : 'No'}</span>
+   646→   646→                      </label>
+   647→   647→                    ) : col.columnType === 'url' ? (
+   648→   648→                      <Input
+   649→   649→                        type="url"
+   650→   650→                        value={customValues[col.id] || ''}
+   651→   651→                        onChange={(e) => setCustomValues((s) => ({ ...s, [col.id]: e.target.value }))}
+   652→   652→                        placeholder="https://…"
+   653→   653→                      />
+   654→   654→                    ) : (
+   655→   655→                      <Input
+   656→   656→                        value={customValues[col.id] || ''}
+   657→   657→                        onChange={(e) => setCustomValues((s) => ({ ...s, [col.id]: e.target.value }))}
+   658→   658→                        placeholder={col.required ? 'Required' : 'Optional'}
+   659→   659→                      />
+   660→   660→                    )}
+   661→   661→                  </div>
+   662→   662→                ))}
+   663→   663→              </div>
+   664→   664→            </div>
+   665→   665→          )}
+   666→   666→
+   667→   667→          {/* API key management (edit only) */}
+   668→   668→          {company && (
+   669→   669→            <div className="border-t pt-3 space-y-3">
+   670→   670→              <label className="flex items-center gap-2 text-sm cursor-pointer">
+   671→   671→                <input type="checkbox" checked={apiKeyActive} onChange={(e) => setApiKeyActive(e.target.checked)} className="accent-primary" />
+   672→   672→                <span>API key active (companies can sign in with this key)</span>
+   673→   673→              </label>
+   674→   674→              <label className="flex items-center gap-2 text-sm cursor-pointer">
+   675→   675→                <input type="checkbox" checked={regenerateKey} onChange={(e) => setRegenerateKey(e.target.checked)} className="accent-primary" />
+   676→   676→                <span className="flex items-center gap-1"><KeyRound className="h-3.5 w-3.5" /> Regenerate API key (invalidates the old one)</span>
+   677→   677→              </label>
+   678→   678→              {regenerateKey && (
+   679→   679→                <p className="text-xs text-amber-600">The previous key stops working immediately. You'll need to share the new one with the company.</p>
+   680→   680→              )}
+   681→   681→            </div>
+   682→   682→          )}
+   683→   683→
+   684→   684→          <DialogFooter>
+   685→   685→            <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
+   686→   686→            <Button type="submit" disabled={saving}>
+   687→   687→              {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+   688→   688→              {company ? 'Save changes' : 'Create company'}
+   689→   689→            </Button>
+   690→   690→          </DialogFooter>
+   691→   691→        </form>
+   692→   692→      </DialogContent>
+   693→   693→    </Dialog>
+   694→   694→  )
+   695→   695→}
+   696→   696→

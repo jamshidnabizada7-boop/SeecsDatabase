@@ -1,10 +1,11 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef, useCallback } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { api, formatCurrency, formatNumber, formatDate } from '@/lib/client-utils'
 import { Button } from '@/components/ui/button'
-import { Building2, Users, DollarSign, Briefcase, Loader2, RefreshCw } from 'lucide-react'
+import { Badge } from '@/components/ui/badge'
+import { Building2, Users, DollarSign, Briefcase, Loader2, RefreshCw, Activity } from 'lucide-react'
 import {
   ChartContainer,
   ChartTooltip,
@@ -33,8 +34,44 @@ interface Stats {
   byDegreeField: { name: string; value: number }[]
   byYear: { year: number; revenue: number; employees: number; projects: number }[]
   topCompaniesByRevenue: { name: string; revenue: number; sector: string }[]
-  recentCompanies: { id: string; name: string; sector: string; city: string; registeredAt: string; apiKey: string }[]
+  recentCompanies: { id: string; name: string; sector: string; city: string; registeredAt: string; apiKey: string; status: string | null }[]
   monthlyTrend: { month: string; value: number }[]
+}
+
+function useCountUp(target: number, duration = 1200) {
+  const [display, setDisplay] = useState(0)
+  const rafRef = useRef<number>(0)
+
+  useEffect(() => {
+    const start = performance.now()
+    let running = true
+
+    function tick() {
+      if (!running) return
+      const elapsed = performance.now() - start
+      const progress = Math.min(elapsed / duration, 1)
+      // ease-out cubic
+      const eased = 1 - Math.pow(1 - progress, 3)
+      setDisplay(Math.round(eased * target))
+      if (progress < 1) {
+        rafRef.current = requestAnimationFrame(tick)
+      }
+    }
+
+    rafRef.current = requestAnimationFrame(tick)
+    return () => {
+      running = false
+      cancelAnimationFrame(rafRef.current)
+    }
+  }, [target, duration])
+
+  return display
+}
+
+const STATUS_STYLES: Record<string, string> = {
+  Active: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+  Inactive: 'bg-amber-50 text-amber-700 border-amber-200',
+  Discontinued: 'bg-rose-50 text-rose-700 border-rose-200',
 }
 
 export default function DashboardPage() {
@@ -89,33 +126,34 @@ export default function DashboardPage() {
 
       {/* KPI cards */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <KpiCard
+        <AnimatedKpiCard
           title="Companies"
-          value={formatNumber(stats.totalCompanies)}
-          icon={<Building2 className="h-4 w-4" />}
+          target={stats.totalCompanies}
+          icon={<Building2 className="h-5 w-5" />}
           hint={`across ${stats.totalSectors} sectors`}
-          color="bg-sky-500"
+          gradient="from-emerald-500 to-emerald-600"
         />
-        <KpiCard
-          title="Founders"
-          value={formatNumber(stats.totalFounders)}
-          icon={<Users className="h-4 w-4" />}
-          hint={`${stats.femaleFounders} female · ${stats.maleFounders} male`}
-          color="bg-rose-500"
-        />
-        <KpiCard
-          title="Total Revenue (all years)"
-          value={formatCurrency(stats.totalRevenueAllTime)}
-          icon={<DollarSign className="h-4 w-4" />}
+        <AnimatedKpiCard
+          title="Revenue (all years)"
+          target={stats.totalRevenueAllTime}
+          icon={<DollarSign className="h-5 w-5" />}
           hint={`avg monthly ${formatCurrency(stats.avgMonthlyRevenue)}`}
-          color="bg-emerald-500"
+          gradient="from-amber-500 to-amber-600"
+          formatValue={(v) => formatCurrency(v)}
         />
-        <KpiCard
+        <AnimatedKpiCard
+          title="Founders"
+          target={stats.totalFounders}
+          icon={<Users className="h-5 w-5" />}
+          hint={`${stats.femaleFounders} female · ${stats.maleFounders} male`}
+          gradient="from-sky-500 to-sky-600"
+        />
+        <AnimatedKpiCard
           title="Projects Tracked"
-          value={formatNumber(stats.totalProjects)}
-          icon={<Briefcase className="h-4 w-4" />}
+          target={stats.totalProjects}
+          icon={<Briefcase className="h-5 w-5" />}
           hint={`${stats.totalEmployees} employees · ${stats.totalAnnualRecords} records`}
-          color="bg-amber-500"
+          gradient="from-violet-500 to-violet-600"
         />
       </div>
 
@@ -300,38 +338,45 @@ export default function DashboardPage() {
         </Card>
       </div>
 
-      {/* Recent registrations */}
+      {/* Recent Activity */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Recent registrations</CardTitle>
-          <CardDescription>Most recently registered companies (with their unique API key).</CardDescription>
+          <CardTitle className="text-base flex items-center gap-2">
+            <Activity className="h-4 w-4" />
+            Recent Activity
+          </CardTitle>
+          <CardDescription>Latest 5 registered companies and their current status.</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-left text-xs uppercase tracking-wider text-muted-foreground border-b">
-                  <th className="py-2 pr-4 font-medium">Company</th>
-                  <th className="py-2 pr-4 font-medium">Sector</th>
-                  <th className="py-2 pr-4 font-medium">City</th>
-                  <th className="py-2 pr-4 font-medium">Registered</th>
-                  <th className="py-2 font-medium">API Key</th>
-                </tr>
-              </thead>
-              <tbody>
-                {stats.recentCompanies.map((c) => (
-                  <tr key={c.id} className="border-b last:border-0 hover:bg-muted/40">
-                    <td className="py-2.5 pr-4 font-medium">{c.name}</td>
-                    <td className="py-2.5 pr-4 text-muted-foreground">{c.sector}</td>
-                    <td className="py-2.5 pr-4 text-muted-foreground">{c.city}</td>
-                    <td className="py-2.5 pr-4 text-muted-foreground">{formatDate(c.registeredAt)}</td>
-                    <td className="py-2.5">
-                      <code className="text-xs bg-muted px-2 py-0.5 rounded font-mono">{c.apiKey.slice(0, 16)}…</code>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="space-y-3">
+            {stats.recentCompanies.slice(0, 5).map((c, i) => (
+              <div
+                key={c.id}
+                className="flex items-center justify-between gap-3 p-3 rounded-lg border bg-card hover:bg-muted/40 transition-colors"
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="h-8 w-8 rounded-full bg-muted grid place-items-center shrink-0">
+                    <span className="text-xs font-bold text-muted-foreground">{i + 1}</span>
+                  </div>
+                  <div className="min-w-0">
+                    <div className="font-medium text-sm truncate">{c.name}</div>
+                    <div className="text-xs text-muted-foreground">{c.sector} · {c.city}</div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3 shrink-0">
+                  <span className="text-xs text-muted-foreground hidden sm:block">{formatDate(c.registeredAt)}</span>
+                  {c.status ? (
+                    <Badge variant="outline" className={`text-xs ${STATUS_STYLES[c.status] || ''}`}>
+                      {c.status}
+                    </Badge>
+                  ) : (
+                    <Badge variant="secondary" className="text-xs bg-emerald-50 text-emerald-700 border-emerald-200">
+                      Registered
+                    </Badge>
+                  )}
+                </div>
+              </div>
+            ))}
             {stats.recentCompanies.length === 0 && (
               <div className="text-sm text-muted-foreground text-center py-8">No companies registered yet.</div>
             )}
@@ -342,17 +387,40 @@ export default function DashboardPage() {
   )
 }
 
-function KpiCard({ title, value, hint, icon, color }: { title: string; value: string; hint: string; icon: React.ReactNode; color: string }) {
+function AnimatedKpiCard({
+  title,
+  target,
+  icon,
+  hint,
+  gradient,
+  formatValue,
+}: {
+  title: string
+  target: number
+  icon: React.ReactNode
+  hint: string
+  gradient: string
+  formatValue?: (v: number) => string
+}) {
+  const count = useCountUp(target)
+  const displayValue = formatValue ? formatValue(count) : formatNumber(count)
+
   return (
-    <Card>
-      <CardContent className="p-5">
-        <div className="flex items-start justify-between">
-          <div>
-            <div className="text-xs font-medium uppercase tracking-wider text-muted-foreground">{title}</div>
-            <div className="text-2xl font-bold mt-1">{value}</div>
-            <div className="text-xs text-muted-foreground mt-1">{hint}</div>
+    <Card className={`overflow-hidden border-0 shadow-md hover:shadow-xl hover:-translate-y-1 transition-all duration-300 cursor-default`}>
+      <CardContent className={`p-5 bg-gradient-to-br ${gradient} text-white relative`}>
+        {/* Decorative circle */}
+        <div className="absolute -right-4 -top-4 h-24 w-24 rounded-full bg-white/10" />
+        <div className="relative z-10">
+          <div className="flex items-start justify-between">
+            <div className="min-w-0">
+              <div className="text-xs font-medium uppercase tracking-wider text-white/80">{title}</div>
+              <div className="text-2xl font-bold mt-1 tracking-tight">{displayValue}</div>
+              <div className="text-xs text-white/70 mt-1.5">{hint}</div>
+            </div>
+            <div className="h-10 w-10 rounded-xl bg-white/20 backdrop-blur-sm grid place-items-center shrink-0">
+              {icon}
+            </div>
           </div>
-          <div className={`h-9 w-9 rounded-lg ${color} text-white grid place-items-center`}>{icon}</div>
         </div>
       </CardContent>
     </Card>
