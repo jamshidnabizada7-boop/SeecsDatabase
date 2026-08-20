@@ -333,6 +333,24 @@ async function main() {
   console.log('🤖 Creating default LLM settings...')
   await db.llmSettings.create({ data: {} })
 
+  console.log('👤 Checking admin user...')
+  const adminEmail = (process.env.ADMIN_BOOTSTRAP_EMAIL || 'admin@seecs.nust.edu.pk').toLowerCase()
+  const existingAdmin = await db.adminUser.findUnique({ where: { email: adminEmail } })
+  if (!existingAdmin) {
+    const rawPw = process.env.ADMIN_BOOTSTRAP_PASSWORD || 'admin12345'
+    const crypto = await import('crypto')
+    const passwordHash = crypto.createHash('sha256').update(rawPw).digest('hex')
+    await db.adminUser.create({
+      data: {
+        email: adminEmail,
+        passwordHash,
+        name: 'SEECS Database Manager',
+        role: 'superadmin',
+      },
+    })
+    console.log('👤 Created default admin user:', adminEmail)
+  }
+
   const counts = await Promise.all([
     db.company.count(),
     db.founder.count(),
@@ -346,4 +364,4 @@ async function main() {
 
 main()
   .catch((e) => { console.error(e); process.exit(1) })
-  .finally(() => db.disconnect())
+  .finally(() => db.$disconnect())

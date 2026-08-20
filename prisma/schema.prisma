@@ -24,9 +24,9 @@ generator client {
 }
 
 datasource db {
-  // DEV: sqlite  |  PRODUCTION (Neon): postgresql
-  provider = "sqlite"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DATABASE_URL_UNPOOLED")
 }
 
 // ----------------------------------------------------------------
