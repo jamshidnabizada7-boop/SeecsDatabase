@@ -386,7 +386,15 @@ function ProfileTab({ company, customColumns, onChanged, revealed, setRevealed }
   const [lookup, setLookup] = useState<Lookup | null>(null)
   const [saving, setSaving] = useState(false)
   const [savingCustom, setSavingCustom] = useState(false)
+  const [copied, setCopied] = useState(false)
   const { toast } = useToast()
+
+  const copyKey = () => {
+    navigator.clipboard?.writeText(company.apiKey)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+    toast({ title: 'API key copied to clipboard' })
+  }
 
   useEffect(() => {
     api<Lookup>('/api/company/lookup').then(setLookup).catch(() => {})
@@ -1309,7 +1317,7 @@ function AnnualTab({ company, onChanged }: { company: CompanyFull; onChanged: ()
   )
 }
 
-function AnnualFormDialog({ open, onOpenChange, existing, onSaved }: { open: boolean; onOpenChange: (o: boolean) => void; existing?: { id: string; year: number; monthlyRevenue: number; totalRevenue: number; employeeCount: number; projectCount: number; notes: string }; onSaved: () => void }) {
+function AnnualFormDialog({ open, onOpenChange, existing, onSaved }: { open: boolean; onOpenChange: (o: boolean) => void; existing?: { id: string; year: number; monthlyRevenue: number; totalRevenue: number; employeeCount: number; projectCount: number; notes: string | null }; onSaved: () => void }) {
   const [year, setYear] = useState('')
   const [monthlyRevenue, setMonthlyRevenue] = useState('')
   const [totalRevenue, setTotalRevenue] = useState('')

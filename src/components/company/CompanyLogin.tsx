@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { api } from '@/lib/client-utils'
 import { Loader2, KeyRound, ArrowLeft, UserPlus, CheckCircle2, AlertTriangle, Building2, Eye, EyeOff, Sparkles } from 'lucide-react'
+import { Separator } from '@/components/ui/separator'
 import { ThemeToggle } from '@/components/theme-toggle'
 
 interface Lookup {
