@@ -1,0 +1,577 @@
+   290→            </div>
+   291→
+   292→            {/* Read-only new fields */
+   293→            {(company.status || company.foundedYear || company.sinceDate || company.branchesCount || company.revenue != null || company.revenueMin != null) && (
+   294→              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3 pt-3 border-t">
+   295→                {company.status && (
+   296→                  <div>
+   297→                    <Label className="text-xs text-muted-foreground">Status</Label>
+   298→                    <div className="mt-1">
+   299→                      <Badge variant="outline" className={`text-xs ${STATUS_STYLES[company.status] || ''}`}>{company.status}</Badge>
+   300→                    </div>
+   301→                  </div>
+   302→                )}
+   303→                {company.foundedYear && (
+   304→                  <div>
+   305→                    <Label className="text-xs text-muted-foreground">Founded year</Label>
+   306→                    <div className="text-sm font-medium mt-1">{company.foundedYear}</div>
+   307→                  </div>
+   308→                )}
+   309→                {company.sinceDate && (
+   310→                  <div>
+   311→                    <Label className="text-xs text-muted-foreground">Since date</Label>
+   312→                    <div className="text-sm font-medium mt-1">{company.sinceDate}</div>
+   313→                  </div>
+   314→                )}
+   315→                {company.branchesCount != null && (
+   316→                  <div>
+   317→                    <Label className="text-xs text-muted-foreground">Branches</Label>
+   318→                    <div className="text-sm font-medium mt-1">{company.branchesCount}</div>
+   319→                  </div>
+   320→                )}
+   321→                {company.revenue != null ? (
+   322→                  <div>
+   323→                    <Label className="text-xs text-muted-foreground">Revenue</Label>
+   324→                    <div className="text-sm font-medium mt-1">{formatCurrency(company.revenue)}</div>
+   325→                  </div>
+   326→                ) : (company.revenueMin != null || company.revenueMax != null) ? (
+   327→                  <div>
+   328→                    <Label className="text-xs text-muted-foreground">Revenue range</Label>
+   329→                    <div className="text-sm font-medium mt-1">{formatCurrency(company.revenueMin || 0)} – {formatCurrency(company.revenueMax || 0)}</div>
+   330→                  </div>
+   331→                ) : null}
+   332→                {company.statusReason && (
+   333→                  <div className="sm:col-span-2">
+   334→                    <Label className="text-xs text-muted-foreground">Status reason</Label>
+   335→                    <div className="text-sm font-medium mt-1">{company.statusReason}</div>
+   336→                  </div>
+   337→                )}
+   338→              </div>
+   339→            )}
+   340→
+   341→            <div className="flex justify-end">
+   342→              <Button type="submit" disabled={saving}>
+   343→                {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+   344→                Save changes
+   345→              </Button>
+   346→            </div>
+   347→          </form>
+   348→        </CardContent>
+   349→      </Card>
+   350→
+   351→      {/* Custom columns card */}
+   352→      {customColumns.length > 0 && (
+   353→        <Card>
+   354→          <CardHeader>
+   355→            <CardTitle className="text-base flex items-center gap-2"><Columns3 className="h-4 w-4" /> Custom fields</CardTitle>
+   356→            <CardDescription>Additional fields defined by the SEECS admin. Fill these in to provide extra information about your company.</CardDescription>
+   357→          </CardHeader>
+   358→          <CardContent className="space-y-4">
+   359→            <div className="grid sm:grid-cols-2 gap-3">
+   360→              {customColumns.map((col) => (
+   361→                <div key={col.id} className="space-y-1.5">
+   362→                  <Label>{col.name}{col.required && <span className="text-destructive ml-1">*</span>}{col.description && <span className="text-xs text-muted-foreground ml-1.5">— {col.description}</span>}</Label>
+   363→                  {col.columnType === 'number' ? (
+   364→                    <Input
+   365→                      type="number"
+   366→                      value={customValues[col.id] || ''}
+   367→                      onChange={(e) => setCustomValues((s) => ({ ...s, [col.id]: e.target.value }))}
+   368→                      placeholder={col.required ? 'Required' : 'Optional'}
+   369→                    />
+   370→                  ) : col.columnType === 'date' ? (
+   371→                    <Input
+   372→                      type="date"
+   373→                      value={customValues[col.id] || ''}
+   374→                      onChange={(e) => setCustomValues((s) => ({ ...s, [col.id]: e.target.value }))}
+   375→                    />
+   376→                  ) : col.columnType === 'boolean' ? (
+   377→                    <label className="flex items-center gap-2 h-9 cursor-pointer">
+   378→                      <input
+   379→                        type="checkbox"
+   380→                        checked={customValues[col.id] === 'true' || customValues[col.id] === '1'}
+   381→                        onChange={(e) => setCustomValues((s) => ({ ...s, [col.id]: e.target.checked ? 'true' : 'false' }))}
+   382→                        className="accent-primary"
+   383→                      />
+   384→                      <span className="text-sm">{customValues[col.id] === 'true' ? 'Yes' : 'No'}</span>
+   385→                    </label>
+   386→                  ) : col.columnType === 'url' ? (
+   387→                    <Input
+   388→                      type="url"
+   389→                      value={customValues[col.id] || ''}
+   390→                      onChange={(e) => setCustomValues((s) => ({ ...s, [col.id]: e.target.value }))}
+   391→                      placeholder="https://…"
+   392→                    />
+   393→                  ) : (
+   394→                    <Input
+   395→                      value={customValues[col.id] || ''}
+   396→                      onChange={(e) => setCustomValues((s) => ({ ...s, [col.id]: e.target.value }))}
+   397→                      placeholder={col.required ? 'Required' : 'Optional'}
+   398→                    />
+   399→                  )}
+   400→                </div>
+   401→              ))}
+   402→            </div>
+   403→            <div className="flex justify-end">
+   404→              <Button onClick={saveCustomValues} disabled={savingCustom}>
+   405→                {savingCustom && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+   406→                Save custom fields
+   407→              </Button>
+   408→            </div>
+   409→          </CardContent>
+   410→        </Card>
+   411→      )}
+   412→
+   413→      {/* API key card */}
+   414→      <Card>
+   415→        <CardHeader>
+   416→          <CardTitle className="text-base flex items-center gap-2"><KeyRound className="h-4 w-4" /> Your API key</CardTitle>
+   417→          <CardDescription>Keep this secret. Anyone with it can sign in to your company portal.</CardDescription>
+   418→        </CardHeader>
+   419→        <CardContent className="space-y-3">
+   420→          <div className="flex items-center gap-2">
+   421→            <code className="flex-1 text-xs font-mono bg-muted px-3 py-2.5 rounded break-all">
+   422→              {revealed ? company.apiKey : `${company.apiKey.slice(0, 14)}••••••••••••••••`}
+   423→            </code>
+   424→            <Button variant="outline" size="sm" onClick={() => setRevealed(!revealed)}>
+   425→              {revealed ? 'Hide' : 'Reveal'}
+   426→            </Button>
+   427→            <Button variant="outline" size="sm" onClick={() => { navigator.clipboard?.writeText(company.apiKey); toast({ title: 'Copied' }) }}>
+   428→              <Copy className="h-4 w-4" />
+   429→            </Button>
+   430→          </div>
+   431→          <Alert>
+   432→            <AlertDescription>
+   433→              To rotate or revoke this key, contact the SEECS database manager. A revoked key immediately loses access.
+   434→            </AlertDescription>
+   435→          </Alert>
+   436→        </CardContent>
+   437→      </Card>
+   438→    </div>
+   439→  )
+   440→}
+   441→
+   442→// =================================================================
+   443→// FOUNDERS TAB
+   444→// =================================================================
+   445→function FoundersTab({ company, onChanged }: { company: CompanyFull; onChanged: () => void }) {
+   446→  const [lookup, setLookup] = useState<Lookup | null>(null)
+   447→  const [adding, setAdding] = useState(false)
+   448→  const [addingExisting, setAddingExisting] = useState(false)
+   449→  const [deleting, setDeleting] = useState<string | null>(null)
+   450→  const { toast } = useToast()
+   451→
+   452→  useEffect(() => {
+   453→    api<Lookup>('/api/company/self/founders').then(setLookup).catch(() => {})
+   454→  }, [])
+   455→
+   456→  const attach = async (founderId: string) => {
+   457→    try {
+   458→      await api('/api/company/self/founders', { method: 'POST', body: { founderId } })
+   459→      toast({ title: 'Attached', description: 'Founder added to your company' })
+   460→      setAddingExisting(false)
+   461→      onChanged()
+   462→    } catch (e: any) {
+   463→      toast({ title: 'Error', description: e.message, variant: 'destructive' })
+   464→    }
+   465→  }
+   466→
+   467→  return (
+   468→    <div className="space-y-4">
+   469→      <Card>
+   470→        <CardHeader className="flex flex-row items-center justify-between space-y-0">
+   471→          <div>
+   472→            <CardTitle className="text-base">Founders & team</CardTitle>
+   473→            <CardDescription>People associated with {company.name}. Adding a founder here does NOT give them access to the portal — only you can sign in with the API key.</CardDescription>
+   474→          </div>
+   475→          <div className="flex gap-2">
+   476→            <Button variant="outline" size="sm" onClick={() => setAddingExisting(true)}>
+   477→              <Plus className="h-4 w-4 mr-1" /> Existing
+   478→            </Button>
+   479→            <Button size="sm" onClick={() => setAdding(true)}>
+   480→              <Plus className="h-4 w-4 mr-1" /> New
+   481→            </Button>
+   482→          </div>
+   483→        </CardHeader>
+   484→        <CardContent>
+   485→          {company.founders.length === 0 ? (
+   486→            <div className="text-center py-10 text-muted-foreground text-sm">
+   487→              <Users className="h-8 w-8 mx-auto mb-2 opacity-40" />
+   488→              No founders yet. Add the people who lead {company.name}.
+   489→            </div>
+   490→          ) : (
+   491→            <div className="grid gap-2">
+   492→              {company.founders.map((cf) => (
+   493→                <div key={cf.id} className="flex items-center gap-3 p-3 border rounded-lg">
+   494→                  <div className="h-9 w-9 rounded-full bg-muted grid place-items-center text-xs font-semibold">
+   495→                    {cf.founder.firstName.charAt(0)}{cf.founder.lastName.charAt(0)}
+   496→                  </div>
+   497→                  <div className="flex-1 min-w-0">
+   498→                    <div className="font-medium text-sm">{cf.founder.firstName} {cf.founder.lastName}</div>
+   499→                    <div className="text-xs text-muted-foreground">
+   500→                      {cf.founder.degree?.name || 'No degree'} · {cf.founder.email || cf.founder.phone || 'No contact'}
+   501→                    </div>
+   502→                  </div>
+   503→                  <Badge variant="outline">{cf.role}</Badge>
+   504→                  <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => setDeleting(cf.founder.id)}>
+   505→                    <Trash2 className="h-4 w-4" />
+   506→                  </Button>
+   507→                </div>
+   508→              ))}
+   509→            </div>
+   510→          )}
+   511→        </CardContent>
+   512→      </Card>
+   513→
+   514→      {/* Add new founder */}
+   515→      <FounderFormDialog
+   516→        open={adding}
+   517→        onOpenChange={setAdding}
+   518→        lookup={lookup}
+   519→        onSaved={() => { setAdding(false); onChanged() }}
+   520→      />
+   521→
+   522→      {/* Attach existing */}
+   523→      <Dialog open={addingExisting} onOpenChange={setAddingExisting}>
+   524→        <DialogContent className="max-w-md">
+   525→          <DialogHeader>
+   526→            <DialogTitle>Add existing founder</DialogTitle>
+   527→            <DialogDescription>Pick a founder already in the registry to attach to {company.name}.</DialogDescription>
+   528→          </DialogHeader>
+   529→          <div className="max-h-80 overflow-y-auto space-y-1">
+   530→            {lookup?.founders.filter((f) => !company.founders.some((cf) => cf.founder.id === f.id)).map((f) => (
+   531→              <button
+   532→                key={f.id}
+   533→                onClick={() => attach(f.id)}
+   534→                className="w-full flex items-center gap-3 p-2 rounded-md hover:bg-muted text-left"
+   535→              >
+   536→                <div className="h-8 w-8 rounded-full bg-muted grid place-items-center text-xs font-semibold">
+   537→                  {f.firstName.charAt(0)}{f.lastName.charAt(0)}
+   538→                </div>
+   539→                <div className="flex-1">
+   540→                  <div className="text-sm font-medium">{f.firstName} {f.lastName}</div>
+   541→                  <div className="text-xs text-muted-foreground">{f.gender}</div>
+   542→                </div>
+   543→                <Plus className="h-4 w-4 text-muted-foreground" />
+   544→              </button>
+   545→            ))}
+   546→            {lookup && lookup.founders.filter((f) => !company.founders.some((cf) => cf.founder.id === f.id)).length === 0 && (
+   547→              <div className="text-center py-8 text-sm text-muted-foreground">No more founders available to add.</div>
+   548→            )}
+   549→          </div>
+   550→        </DialogContent>
+   551→      </Dialog>
+   552→
+   553→      {/* Detach confirm */}
+   554→      <AlertDialog open={!!deleting} onOpenChange={(o) => !o && setDeleting(null)}>
+   555→        <AlertDialogContent>
+   556→          <AlertDialogHeader>
+   557→            <AlertDialogTitle>Remove this founder from {company.name}?</AlertDialogTitle>
+   558→            <AlertDialogDescription>
+   559→              The founder record stays in the SEECS registry (they may be attached to other companies) but will no longer be associated with your company.
+   560→            </AlertDialogDescription>
+   561→          </AlertDialogHeader>
+   562→          <AlertDialogFooter>
+   563→            <AlertDialogCancel>Cancel</AlertDialogCancel>
+   564→            <AlertDialogAction
+   565→              onClick={async () => {
+   566→                try {
+   567→                  await api(`/api/company/self/founders/${deleting}`, { method: 'DELETE' })
+   568→                  toast({ title: 'Removed', description: 'Founder detached from your company' })
+   569→                  setDeleting(null)
+   570→                  onChanged()
+   571→                } catch (e: any) {
+   572→                  toast({ title: 'Error', description: e.message, variant: 'destructive' })
+   573→                }
+   574→              }}
+   575→            >
+   576→              Remove
+   577→            </AlertDialogAction>
+   578→          </AlertDialogFooter>
+   579→        </AlertDialogContent>
+   580→      </AlertDialog>
+   581→    </div>
+   582→  )
+   583→}
+   584→
+   585→function FounderFormDialog({ open, onOpenChange, lookup, onSaved }: { open: boolean; onOpenChange: (o: boolean) => void; lookup: Lookup | null; onSaved: () => void }) {
+   586→  const [firstName, setFirstName] = useState('')
+   587→  const [lastName, setLastName] = useState('')
+   588→  const [gender, setGender] = useState('Male')
+   589→  const [email, setEmail] = useState('')
+   590→  const [phone, setPhone] = useState('')
+   591→  const [degreeId, setDegreeId] = useState('')
+   592→  const [role, setRole] = useState('Co-Founder')
+   593→  const [saving, setSaving] = useState(false)
+   594→  const { toast } = useToast()
+   595→
+   596→  useEffect(() => {
+   597→    if (open) {
+   598→      setFirstName(''); setLastName(''); setGender('Male'); setEmail(''); setPhone(''); setDegreeId(''); setRole('Co-Founder')
+   599→    }
+   600→  }, [open])
+   601→
+   602→  const submit = async (e: React.FormEvent) => {
+   603→    e.preventDefault()
+   604→    setSaving(true)
+   605→    try {
+   606→      await api('/api/company/self/founders', { method: 'POST', body: { firstName, lastName, gender, email, phone, degreeId: degreeId || null, role } })
+   607→      toast({ title: 'Added', description: 'Founder added to your company' })
+   608→      onSaved()
+   609→    } catch (e: any) {
+   610→      toast({ title: 'Error', description: e.message, variant: 'destructive' })
+   611→    } finally {
+   612→      setSaving(false)
+   613→    }
+   614→  }
+   615→
+   616→  return (
+   617→    <Dialog open={open} onOpenChange={onOpenChange}>
+   618→      <DialogContent>
+   619→        <DialogHeader>
+   620→          <DialogTitle>Add a new founder</DialogTitle>
+   621→          <DialogDescription>This founder will be created in the SEECS registry and attached to your company.</DialogDescription>
+   622→        </DialogHeader>
+   623→        <form onSubmit={submit} className="space-y-3">
+   624→          <div className="grid grid-cols-2 gap-3">
+   625→            <div className="space-y-1.5">
+   626→              <Label>First name *</Label>
+   627→              <Input value={firstName} onChange={(e) => setFirstName(e.target.value)} required />
+   628→            </div>
+   629→            <div className="space-y-1.5">
+   630→              <Label>Last name *</Label>
+   631→              <Input value={lastName} onChange={(e) => setLastName(e.target.value)} required />
+   632→            </div>
+   633→            <div className="space-y-1.5">
+   634→              <Label>Gender *</Label>
+   635→              <select className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm" value={gender} onChange={(e) => setGender(e.target.value)}>
+   636→                <option>Male</option>
+   637→                <option>Female</option>
+   638→                <option>Other</option>
+   639→              </select>
+   640→            </div>
+   641→            <div className="space-y-1.5">
+   642→              <Label>Role</Label>
+   643→              <Input value={role} onChange={(e) => setRole(e.target.value)} placeholder="CEO / CTO / Co-Founder" />
+   644→            </div>
+   645→            <div className="space-y-1.5">
+   646→              <Label>Email</Label>
+   647→              <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+   648→            </div>
+   649→            <div className="space-y-1.5">
+   650→              <Label>Phone</Label>
+   651→              <Input value={phone} onChange={(e) => setPhone(e.target.value)} />
+   652→            </div>
+   653→            <div className="space-y-1.5 col-span-2">
+   654→              <Label>Degree</Label>
+   655→              <select className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm" value={degreeId} onChange={(e) => setDegreeId(e.target.value)}>
+   656→                <option value="">— None —</option>
+   657→                {lookup?.degrees.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+   658→              </select>
+   659→            </div>
+   660→          </div>
+   661→          <DialogFooter>
+   662→            <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
+   663→            <Button type="submit" disabled={saving}>
+   664→              {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+   665→              Add founder
+   666→            </Button>
+   667→          </DialogFooter>
+   668→        </form>
+   669→      </DialogContent>
+   670→    </Dialog>
+   671→  )
+   672→}
+   673→
+   674→// =================================================================
+   675→// ANNUAL DATA TAB
+   676→// =================================================================
+   677→function AnnualTab({ company, onChanged }: { company: CompanyFull; onChanged: () => void }) {
+   678→  const [editing, setEditing] = useState<{ id: string; year: number; monthlyRevenue: number; totalRevenue: number; employeeCount: number; projectCount: number; notes: string } | null>(null)
+   679→  const [creating, setCreating] = useState(false)
+   680→  const [deleting, setDeleting] = useState<string | null>(null)
+   681→  const { toast } = useToast()
+   682→
+   683→  return (
+   684→    <div className="space-y-4">
+   685→      <Card>
+   686→        <CardHeader className="flex flex-row items-center justify-between space-y-0">
+   687→          <div>
+   688→            <CardTitle className="text-base">Annual financial data</CardTitle>
+   689→            <CardDescription>Report your company's revenue, headcount and project count for each year.</CardDescription>
+   690→          </div>
+   691→          <Button size="sm" onClick={() => setCreating(true)}>
+   692→            <Plus className="h-4 w-4 mr-1" /> Add year
+   693→          </Button>
+   694→        </CardHeader>
+   695→        <CardContent>
+   696→          {company.annualData.length === 0 ? (
+   697→            <div className="text-center py-10 text-muted-foreground text-sm">
+   698→              <DollarSign className="h-8 w-8 mx-auto mb-2 opacity-40" />
+   699→              No annual data yet. Add your first year of financial performance.
+   700→            </div>
+   701→          ) : (
+   702→            <div className="overflow-x-auto">
+   703→              <table className="w-full text-sm">
+   704→                <thead>
+   705→                  <tr className="text-left text-xs uppercase tracking-wider text-muted-foreground border-b">
+   706→                    <th className="py-2 pr-4 font-medium">Year</th>
+   707→                    <th className="py-2 pr-4 font-medium">Monthly rev.</th>
+   708→                    <th className="py-2 pr-4 font-medium">Total rev.</th>
+   709→                    <th className="py-2 pr-4 font-medium">Employees</th>
+   710→                    <th className="py-2 pr-4 font-medium">Projects</th>
+   711→                    <th className="py-2 font-medium text-right">Actions</th>
+   712→                  </tr>
+   713→                </thead>
+   714→                <tbody>
+   715→                  {company.annualData.map((r) => (
+   716→                    <tr key={r.id} className="border-b last:border-0 hover:bg-muted/40">
+   717→                      <td className="py-2.5 pr-4 font-medium">{r.year}</td>
+   718→                      <td className="py-2.5 pr-4">{formatCurrency(r.monthlyRevenue)}</td>
+   719→                      <td className="py-2.5 pr-4">{formatCurrency(r.totalRevenue)}</td>
+   720→                      <td className="py-2.5 pr-4">{r.employeeCount}</td>
+   721→                      <td className="py-2.5 pr-4">{r.projectCount}</td>
+   722→                      <td className="py-2.5 text-right">
+   723→                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setEditing(r)}>
+   724→                          <Pencil className="h-3.5 w-3.5" />
+   725→                        </Button>
+   726→                        <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => setDeleting(r.id)}>
+   727→                          <Trash2 className="h-3.5 w-3.5" />
+   728→                        </Button>
+   729→                      </td>
+   730→                    </tr>
+   731→                  ))}
+   732→                </tbody>
+   733→              </table>
+   734→            </div>
+   735→          )}
+   736→        </CardContent>
+   737→      </Card>
+   738→
+   739→      <AnnualFormDialog open={creating} onOpenChange={setCreating} onSaved={() => { setCreating(false); onChanged() }} />
+   740→      <AnnualFormDialog open={!!editing} onOpenChange={(o) => !o && setEditing(null)} existing={editing || undefined} onSaved={() => { setEditing(null); onChanged() }} />
+   741→
+   742→      <AlertDialog open={!!deleting} onOpenChange={(o) => !o && setDeleting(null)}>
+   743→        <AlertDialogContent>
+   744→          <AlertDialogHeader>
+   745→            <AlertDialogTitle>Delete this annual record?</AlertDialogTitle>
+   746→            <AlertDialogDescription>This removes the revenue data for that year. You can re-add it later.</AlertDialogDescription>
+   747→          </AlertDialogHeader>
+   748→          <AlertDialogFooter>
+   749→            <AlertDialogCancel>Cancel</AlertDialogCancel>
+   750→            <AlertDialogAction
+   751→              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+   752→              onClick={async () => {
+   753→                try {
+   754→                  await api(`/api/company/self/annual-data/${deleting}`, { method: 'DELETE' })
+   755→                  toast({ title: 'Deleted', description: 'Annual record removed' })
+   756→                  setDeleting(null)
+   757→                  onChanged()
+   758→                } catch (e: any) {
+   759→                  toast({ title: 'Error', description: e.message, variant: 'destructive' })
+   760→                }
+   761→              }}
+   762→            >
+   763→              Delete
+   764→            </AlertDialogAction>
+   765→          </AlertDialogFooter>
+   766→        </AlertDialogContent>
+   767→      </AlertDialog>
+   768→    </div>
+   769→  )
+   770→}
+   771→
+   772→function AnnualFormDialog({ open, onOpenChange, existing, onSaved }: { open: boolean; onOpenChange: (o: boolean) => void; existing?: { id: string; year: number; monthlyRevenue: number; totalRevenue: number; employeeCount: number; projectCount: number; notes: string }; onSaved: () => void }) {
+   773→  const [year, setYear] = useState('')
+   774→  const [monthlyRevenue, setMonthlyRevenue] = useState('')
+   775→  const [totalRevenue, setTotalRevenue] = useState('')
+   776→  const [employeeCount, setEmployeeCount] = useState('')
+   777→  const [projectCount, setProjectCount] = useState('')
+   778→  const [notes, setNotes] = useState('')
+   779→  const [saving, setSaving] = useState(false)
+   780→  const { toast } = useToast()
+   781→
+   782→  useEffect(() => {
+   783→    if (open) {
+   784→      setYear(existing ? String(existing.year) : String(new Date().getFullYear() - 1))
+   785→      setMonthlyRevenue(existing ? String(existing.monthlyRevenue) : '')
+   786→      setTotalRevenue(existing ? String(existing.totalRevenue) : '')
+   787→      setEmployeeCount(existing ? String(existing.employeeCount) : '')
+   788→      setProjectCount(existing ? String(existing.projectCount) : '')
+   789→      setNotes(existing?.notes || '')
+   790→    }
+   791→  }, [open, existing])
+   792→
+   793→  const submit = async (e: React.FormEvent) => {
+   794→    e.preventDefault()
+   795→    setSaving(true)
+   796→    try {
+   797→      const body = {
+   798→        year: Number(year),
+   799→        monthlyRevenue: Number(monthlyRevenue) || 0,
+   800→        totalRevenue: Number(totalRevenue) || (Number(monthlyRevenue) || 0) * 12,
+   801→        employeeCount: Number(employeeCount) || 0,
+   802→        projectCount: Number(projectCount) || 0,
+   803→        notes: notes || null,
+   804→      }
+   805→      if (existing) {
+   806→        await api(`/api/company/self/annual-data/${existing.id}`, { method: 'PUT', body })
+   807→        toast({ title: 'Saved', description: 'Annual data updated' })
+   808→      } else {
+   809→        await api('/api/company/self/annual-data', { method: 'POST', body })
+   810→        toast({ title: 'Added', description: 'Annual data added' })
+   811→      }
+   812→      onSaved()
+   813→    } catch (e: any) {
+   814→      toast({ title: 'Error', description: e.message, variant: 'destructive' })
+   815→    } finally {
+   816→      setSaving(false)
+   817→    }
+   818→  }
+   819→
+   820→  return (
+   821→    <Dialog open={open} onOpenChange={onOpenChange}>
+   822→      <DialogContent>
+   823→        <DialogHeader>
+   824→          <DialogTitle>{existing ? 'Edit annual data' : 'Add annual data'}</DialogTitle>
+   825→          <DialogDescription>Report your company's financial performance for a specific year.</DialogDescription>
+   826→        </DialogHeader>
+   827→        <form onSubmit={submit} className="space-y-3">
+   828→          <div className="grid grid-cols-2 gap-3">
+   829→            <div className="space-y-1.5">
+   830→              <Label>Year *</Label>
+   831→              <Input type="number" value={year} onChange={(e) => setYear(e.target.value)} required min="2000" max="2100" />
+   832→            </div>
+   833→            <div className="space-y-1.5">
+   834→              <Label>Monthly revenue (PKR)</Label>
+   835→              <Input type="number" value={monthlyRevenue} onChange={(e) => setMonthlyRevenue(e.target.value)} placeholder="0" />
+   836→            </div>
+   837→            <div className="space-y-1.5">
+   838→              <Label>Total revenue (PKR)</Label>
+   839→              <Input type="number" value={totalRevenue} onChange={(e) => setTotalRevenue(e.target.value)} placeholder="auto = monthly × 12" />
+   840→            </div>
+   841→            <div className="space-y-1.5">
+   842→              <Label>Employees</Label>
+   843→              <Input type="number" value={employeeCount} onChange={(e) => setEmployeeCount(e.target.value)} placeholder="0" />
+   844→            </div>
+   845→            <div className="space-y-1.5">
+   846→              <Label>Projects</Label>
+   847→              <Input type="number" value={projectCount} onChange={(e) => setProjectCount(e.target.value)} placeholder="0" />
+   848→            </div>
+   849→            <div className="space-y-1.5 col-span-2">
+   850→              <Label>Notes</Label>
+   851→              <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} />
+   852→            </div>
+   853→          </div>
+   854→          <DialogFooter>
+   855→            <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
+   856→            <Button type="submit" disabled={saving}>
+   857→              {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+   858→              {existing ? 'Save changes' : 'Add year'}
+   859→            </Button>
+   860→          </DialogFooter>
+   861→        </form>
+   862→      </DialogContent>
+   863→    </Dialog>
+   864→  )
+   865→}
+   866→

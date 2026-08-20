@@ -1,0 +1,227 @@
+// SEECS Database Management System - NUST University Islamabad
+// Prisma schema
+//
+// ============================================================
+// HOW TO HOST THIS ON NEON (PostgreSQL) - read carefully
+// ============================================================
+// The dev sandbox uses SQLite so the project runs out of the box.
+// To deploy on Neon, do exactly TWO things:
+//
+//   1) In this file, change `provider = "sqlite"`  ->  `provider = "postgresql"`
+//      (every model below is already PostgreSQL-compatible: no SQLite-only types,
+//       no JSON arrays, all relations are explicit junction tables.)
+//
+//   2) Set your Neon connection string in .env:
+//        DATABASE_URL="postgresql://USER:PASSWORD@ep-xxx.us-east-2.aws.neon.tech/seecs?sslmode=require"
+//
+//   Then run:  bun run db:push
+//
+// That's it. No code changes needed anywhere else.
+// ============================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  // DEV: sqlite  |  PRODUCTION (Neon): postgresql
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ----------------------------------------------------------------
+// Admin user (the "database responsible person") - simple password auth
+// ----------------------------------------------------------------
+model AdminUser {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  name         String
+  role         String   @default("admin") // "admin" | "superadmin"
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+// ----------------------------------------------------------------
+// Lookup / dimension tables
+// ----------------------------------------------------------------
+model Sector {
+  id        String     @id @default(cuid())
+  name      String     @unique // e.g. "Data Science", "Software Engineering", "Cyber Security"
+  createdAt DateTime   @default(now())
+  companies Company[]
+}
+
+model City {
+  id        String     @id @default(cuid())
+  name      String     @unique
+  createdAt DateTime   @default(now())
+  companies Company[]
+  locations Location[]
+}
+
+model Location {
+  id        String   @id @default(cuid())
+  address   String
+  country   String   @default("Pakistan")
+  cityId    String
+  city      City     @relation(fields: [cityId], references: [id], onDelete: Restrict)
+  createdAt DateTime @default(now())
+  companies Company[]
+}
+
+// ----------------------------------------------------------------
+// Founder (a person who founded one or more companies)
+// ----------------------------------------------------------------
+model Founder {
+  id        String           @id @default(cuid())
+  firstName String
+  lastName  String
+  gender    String           // "Male" | "Female" | "Other"
+  email     String?
+  phone     String?
+  department String?         // e.g. "Computer Science", "Electrical Engineering"
+  degreeId  String?
+  degree    Degree?          @relation(fields: [degreeId], references: [id], onDelete: SetNull)
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+  companies CompanyFounder[]
+}
+
+model Degree {
+  id        String    @id @default(cuid())
+  name      String    @unique // e.g. "BS Computer Science", "MS Data Science"
+  field     String? // "Data Science" | "Software Engineering" | ...
+  createdAt DateTime  @default(now())
+  founders  Founder[]
+}
+
+// ----------------------------------------------------------------
+// Company - the central entity (all fields from Java MySQL schema)
+// ----------------------------------------------------------------
+model Company {
+  id            String             @id @default(cuid())
+  name          String
+   description   String?
+  email         String?
+  phone         String?
+  website       String?
+  // Status & lifecycle fields (from Java app)
+  status        String?            // e.g. "Active", "Inactive", "Discontinued"
+  statusReason  String?            // reason for current status
+  sinceDate     String?            // YYYY-MM-DD format (SQLite string)
+  foundedYear   Int?               // e.g. 2018
+  discontinuedDate String?          // YYYY-MM-DD format
+  branchesCount Int?               // number of branches
+  // Revenue fields (from CompanyDAO)
+  revenue       Int?               // exact revenue figure (PKR)
+  revenueMin    Int?               // min revenue range
+  revenueMax    Int?               // max revenue range
+  // Ownership / scope fields (used for strict per-company isolation)
+  apiKey        String             @unique @default(cuid()) // the per-company key
+  apiKeyActive  Boolean            @default(true)
+  // Foreign keys
+  sectorId      String
+  sector        Sector             @relation(fields: [sectorId], references: [id], onDelete: Restrict)
+  cityId        String
+  city          City               @relation(fields: [cityId], references: [id], onDelete: Restrict)
+  locationId    String?
+  location      Location?          @relation(fields: [locationId], references: [id], onDelete: SetNull)
+  // Lifecycle
+  registeredAt DateTime           @default(now())
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+  // Relations
+  founders      CompanyFounder[]
+  annualData    CompanyAnnualData[]
+  customValues  CompanyCustomValue[]
+}
+
+// Junction: Company <-> Founder (a founder can be on multiple companies)
+model CompanyFounder {
+  id        String   @id @default(cuid())
+  companyId String
+  founderId String
+  role      String   @default("Co-Founder") // "CEO" | "CTO" | "Co-Founder" ...
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  founder   Founder  @relation(fields: [founderId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([companyId, founderId])
+}
+
+// ----------------------------------------------------------------
+// Company annual financial / operational data
+// ----------------------------------------------------------------
+model CompanyAnnualData {
+  id             String   @id @default(cuid())
+  companyId      String
+  company        Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  year           Int
+  monthlyRevenue Decimal  @default(0) // average monthly revenue for that year
+  totalRevenue   Decimal  @default(0)
+  employeeCount  Int      @default(0)
+  projectCount   Int      @default(0)
+  notes          String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([companyId, year])
+}
+
+// ----------------------------------------------------------------
+// Dynamic Custom Columns - admin can add new columns at runtime
+// ----------------------------------------------------------------
+model CustomColumn {
+  id          String   @id @default(cuid())
+  name        String   // display name, e.g. "Number of Awards"
+  slug        String   @unique // machine name, e.g. "number_of_awards"
+  columnType  String   @default("text") // "text" | "number" | "date" | "boolean" | "url"
+  targetTable String   @default("company") // "company" | "founder" - which entity this column belongs to
+  description String?  // optional description for companies
+  required    Boolean  @default(false)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  // Relations
+  values      CompanyCustomValue[]
+}
+
+// Stores the actual values for each company's custom columns
+model CompanyCustomValue {
+  id            String      @id @default(cuid())
+  companyId     String
+  company       Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  customColumnId String
+  customColumn  CustomColumn @relation(fields: [customColumnId], references: [id], onDelete: Cascade)
+  value         String      @default("") // stored as string, parsed by columnType
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@unique([companyId, customColumnId])
+}
+
+// ----------------------------------------------------------------
+// LLM settings - admin-configurable (the "placeholder" the user asked for)
+// ----------------------------------------------------------------
+model LlmSettings {
+  id          String   @id @default("default")
+  provider    String   @default("zai") // "zai" | "openai" | "anthropic" | "custom"
+  apiKey      String?  // admin pastes their own key here
+  baseUrl     String?  // for custom / OpenAI-compatible endpoints
+  model       String   @default("glm-4.6")
+  systemPrompt String? // optional override of the built-in system prompt
+  temperature Float    @default(0.3)
+  enabled     Boolean  @default(true)
+  updatedAt   DateTime @updatedAt
+}
+
+// ----------------------------------------------------------------
+// Chatbot conversation log (admin can review past Q&A)
+// ----------------------------------------------------------------
+model ChatLog {
+  id        String   @id @default(cuid())
+  role      String // "user" | "assistant"
+  content   String
+  createdAt DateTime @default(now())
+}

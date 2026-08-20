@@ -1,0 +1,395 @@
+     1→package app;
+     2→import com.sun.net.httpserver.HttpServer;
+     3→import java.io.IOException;
+     4→import java.io.OutputStream;
+     5→import java.net.InetSocketAddress;
+     6→
+     7→public class MainApp {
+     8→    public static void main(String[] args) throws IOException {
+     9→        // Create server on port 8000
+    10→        HttpServer server = HttpServer.create(new InetSocketAddress(5000), 0);
+    11→
+    12→        // Root Menu Page with Professional Design
+    13→        server.createContext("/", exchange -> {
+    14→            String bodyContent = """
+    15→                 <div class="stats-grid">
+    16→                                                                                      <div class="stat-card">
+    17→                                                                                          <div class="stat-number">8</div>
+    18→                                                                                          <div class="stat-label">Management Modules</div>
+    19→                                                                                      </div>
+    20→                                                                                      <div class="stat-card">
+    21→                                                                                          <div class="stat-number">∞</div>
+    22→                                                                                          <div class="stat-label">Data Records</div>
+    23→                                                                                      </div>
+    24→                                                                                      <div class="stat-card">
+    25→                                                                                          <div class="stat-number">24/7</div>
+    26→                                                                                          <div class="stat-label">System Availability</div>
+    27→                                                                                      </div>
+    28→                                                                                      <div class="stat-card">
+    29→                                                                                          <div class="stat-number">CRUD</div>
+    30→                                                                                          <div class="stat-label">Operations</div>
+    31→                                                                                      </div>
+    32→                                                                                  </div>
+    33→                    
+    34→                                                                                  <div class="card">
+    35→                                                                                      <div class="card-header">
+    36→                                                                                          <h2 class="card-title">System Navigation</h2>
+    37→                                                                                          <p class="card-description">Select a module to manage your business data efficiently</p>
+    38→                                                                                      </div>
+    39→                    
+    40→                                                                                      <div class="grid grid-cols-2">
+    41→                                                                                          <div class="module-section">
+    42→                                                                                              <h3 class="section-title">
+    43→                                                                                                  <span class="section-icon">🏢</span>
+    44→                                                                                                  Core Business
+    45→                                                                                              </h3>
+    46→                                                                                              <div class="module-list">
+    47→                                                                                                  <a href="/company" class="module-link">
+    48→                                                                                                      <div class="module-card">
+    49→                                                                                                          <div class="module-icon">🏢</div>
+    50→                                                                                                          <div class="module-content">
+    51→                                                                                                              <h4>Company Management</h4>
+    52→                                                                                                              <p>Manage company profiles, information, and details</p>
+    53→                                                                                                          </div>
+    54→                                                                                                          <div class="module-arrow">→</div>
+    55→                                                                                                      </div>
+    56→                                                                                                  </a>
+    57→                    
+    58→                                                                                                  <a href="/annual" class="module-link">
+    59→                                                                                                      <div class="module-card">
+    60→                                                                                                          <div class="module-icon">📊</div>
+    61→                                                                                                          <div class="module-content">
+    62→                                                                                                              <h4>Annual Data</h4>
+    63→                                                                                                              <p>Track yearly performance and financial metrics</p>
+    64→                                                                                                          </div>
+    65→                                                                                                          <div class="module-arrow">→</div>
+    66→                                                                                                      </div>
+    67→                                                                                                  </a>
+    68→                    
+    69→                                                                                                  <a href="/branch" class="module-link">
+    70→                                                                                                      <div class="module-card">
+    71→                                                                                                          <div class="module-icon">🏬</div>
+    72→                                                                                                          <div class="module-content">
+    73→                                                                                                              <h4>Branch Locations</h4>
+    74→                                                                                                              <p>Manage company branches across different cities</p>
+    75→                                                                                                          </div>
+    76→                                                                                                          <div class="module-arrow">→</div>
+    77→                                                                                                      </div>
+    78→                                                                                                  </a>
+    79→                    
+    80→                                                                                                  <a href="/sector" class="module-link">
+    81→                                                                                                      <div class="module-card">
+    82→                                                                                                          <div class="module-icon">⚙️</div>
+    83→                                                                                                          <div class="module-content">
+    84→                                                                                                              <h4>Business Sectors</h4>
+    85→                                                                                                              <p>Define and categorize industry sectors</p>
+    86→                                                                                                          </div>
+    87→                                                                                                          <div class="module-arrow">→</div>
+    88→                                                                                                      </div>
+    89→                                                                                                  </a>
+    90→                                                                                              </div>
+    91→                                                                                          </div>
+    92→                    
+    93→                                                                                          <div class="module-section">
+    94→                                                                                              <h3 class="section-title">
+    95→                                                                                                  <span class="section-icon">👥</span>
+    96→                                                                                                  People & Relations
+    97→                                                                                              </h3>
+    98→                                                                                              <div class="module-list">
+    99→                                                                                                  <a href="/founder" class="module-link">
+   100→                                                                                                      <div class="module-card">
+   101→                                                                                                          <div class="module-icon">👤</div>
+   102→                                                                                                          <div class="module-content">
+   103→                                                                                                              <h4>Founder Profiles</h4>
+   104→                                                                                                              <p>Manage entrepreneur and founder information</p>
+   105→                                                                                                          </div>
+   106→                                                                                                          <div class="module-arrow">→</div>
+   107→                                                                                                      </div>
+   108→                                                                                                  </a>
+   109→                    
+   110→                                                                                                  <a href="/founderlink" class="module-link">
+   111→                                                                                                      <div class="module-card">
+   112→                                                                                                          <div class="module-icon">🔗</div>
+   113→                                                                                                          <div class="module-content">
+   114→                                                                                                              <h4>Founder Links</h4>
+   115→                                                                                                              <p>Connect founders with their companies</p>
+   116→                                                                                                          </div>
+   117→                                                                                                          <div class="module-arrow">→</div>
+   118→                                                                                                      </div>
+   119→                                                                                                  </a>
+   120→                    
+   121→                                                                                                  <a href="/degree" class="module-link">
+   122→                                                                                                      <div class="module-card">
+   123→                                                                                                          <div class="module-icon">🎓</div>
+   124→                                                                                                          <div class="module-content">
+   125→                                                                                                              <h4>Academic Degrees</h4>
+   126→                                                                                                              <p>Manage educational qualifications and degrees</p>
+   127→                                                                                                          </div>
+   128→                                                                                                          <div class="module-arrow">→</div>
+   129→                                                                                                      </div>
+   130→                                                                                                  </a>
+   131→                    
+   132→                                                                                                  <a href="/location" class="module-link">
+   133→                                                                                                      <div class="module-card">
+   134→                                                                                                          <div class="module-icon">🌍</div>
+   135→                                                                                                          <div class="module-content">
+   136→                                                                                                              <h4>Geographic Locations</h4>
+   137→                                                                                                              <p>Manage cities, regions, and geographic data</p>
+   138→                                                                                                          </div>
+   139→                                                                                                          <div class="module-arrow">→</div>
+   140→                                                                                                      </div>
+   141→                                                                                                  </a>
+   142→                                                                                              </div>
+   143→                                                                                          </div>
+   144→                    
+   145→                                                                                          <!-- 📊 Reports Section -->
+   146→                                                                                          <div class="module-section">
+   147→                                                                                              <h3 class="section-title">
+   148→                                                                                                  <span class="section-icon">📊</span>
+   149→                                                                                                  Reports & Insights
+   150→                                                                                              </h3>
+   151→                                                                                              <div class="module-list">
+   152→                                                                                                  <a href="/report" class="module-link">
+   153→                                                                                                      <div class="module-card">
+   154→                                                                                                          <div class="module-icon">📑</div>
+   155→                                                                                                          <div class="module-content">
+   156→                                                                                                              <h4>Analytics Dashboard</h4>
+   157→                                                                                                              <p>Explore predefined insights from your database</p>
+   158→                                                                                                          </div>
+   159→                                                                                                          <div class="module-arrow">→</div>
+   160→                                                                                                      </div>
+   161→                                                                                                  </a>
+   162→                                                                                              </div>
+   163→                                                                                          </div>
+   164→                                                                                      </div>
+   165→                                                                                  </div>
+   166→                    
+   167→                                                                                  <div class="card">
+   168→                                                                                      <div class="card-header">
+   169→                                                                                          <h2 class="card-title">Quick Actions</h2>
+   170→                                                                                          <p class="card-description">Frequently used operations</p>
+   171→                                                                                      </div>
+   172→                    
+   173→                                                                                      <div class="grid grid-cols-3">
+   174→                                                                                          <a href="/company" class="btn btn-primary">
+   175→                                                                                              <span>📈</span>
+   176→                                                                                              View Dashboard
+   177→                                                                                          </a>
+   178→                                                                                          <a href="/addCompany" class="btn btn-secondary">
+   179→                                                                                              <span>➕</span>
+   180→                                                                                              Add New Company
+   181→                                                                                          </a>
+   182→                                                                                          <a href="/addFounder" class="btn btn-secondary">
+   183→                                                                                              <span>👤</span>
+   184→                                                                                              Register Founder
+   185→                                                                                          </a>
+   186→                                                                                          <a href="/report" class="btn btn-primary">
+   187→                                                                                              <span>📑</span>
+   188→                                                                                              View Reports
+   189→                                                                                          </a>
+   190→                                                                                      </div>
+   191→                                                                                  </div>
+   192→                    
+   193→                                                                                  <style>
+   194→                                                                                      .module-section { margin-bottom: 2rem; }
+   195→                                                                                      .section-title { display: flex; align-items: center; gap: 0.75rem; font-size: 1.25rem; font-weight: 600; color: var(--text-primary); margin-bottom: 1rem; padding-bottom: 0.5rem; border-bottom: 2px solid var(--border-color); }
+   196→                                                                                      .section-icon { font-size: 1.5rem; }
+   197→                                                                                      .module-list { display: flex; flex-direction: column; gap: 0.75rem; }
+   198→                                                                                      .module-link { text-decoration: none; color: inherit; }
+   199→                                                                                      .module-card { display: flex; align-items: center; padding: 1rem; background: white; border: 1px solid var(--border-color); border-radius: var(--radius-md); transition: all 0.2s ease; cursor: pointer; gap: 1rem; }
+   200→                                                                                      .module-card:hover { border-color: var(--primary-color); box-shadow: var(--shadow-md); transform: translateY(-1px); }
+   201→                                                                                      .module-icon { font-size: 1.5rem; width: 2.5rem; height: 2.5rem; display: flex; align-items: center; justify-content: center; background: var(--secondary-color); border-radius: var(--radius-sm); flex-shrink: 0; }
+   202→                                                                                      .module-content { flex: 1; }
+   203→                                                                                      .module-content h4 { font-size: 1rem; font-weight: 600; color: var(--text-primary); margin-bottom: 0.25rem; }
+   204→                                                                                      .module-content p { font-size: 0.875rem; color: var(--text-secondary); margin: 0; line-height: 1.4; }
+   205→                                                                                      .module-arrow { font-size: 1.25rem; color: var(--text-secondary); transition: all 0.2s ease; flex-shrink: 0; }
+   206→                                                                                      .module-card:hover .module-arrow { color: var(--primary-color); transform: translateX(2px); }
+   207→                                                                                      @media (max-width: 768px) {
+   208→                                                                                          .grid-cols-2 { grid-template-columns: 1fr; }
+   209→                                                                                          .grid-cols-3 { grid-template-columns: 1fr; }
+   210→                                                                                          .module-card { padding: 0.75rem; }
+   211→                                                                                          .section-title { font-size: 1.125rem; }
+   212→                                                                                      }
+   213→                                                                                  </style>
+   214→                                                                              ";
+   215→                    
+   216→                </div>
+   217→
+   218→                <style>
+   219→                    .module-section {
+   220→                        margin-bottom: 2rem;
+   221→                    }
+   222→                    
+   223→                    .section-title {
+   224→                        display: flex;
+   225→                        align-items: center;
+   226→                        gap: 0.75rem;
+   227→                        font-size: 1.25rem;
+   228→                        font-weight: 600;
+   229→                        color: var(--text-primary);
+   230→                        margin-bottom: 1rem;
+   231→                        padding-bottom: 0.5rem;
+   232→                        border-bottom: 2px solid var(--border-color);
+   233→                    }
+   234→                    
+   235→                    .section-icon {
+   236→                        font-size: 1.5rem;
+   237→                    }
+   238→                    
+   239→                    .module-list {
+   240→                        display: flex;
+   241→                        flex-direction: column;
+   242→                        gap: 0.75rem;
+   243→                    }
+   244→                    
+   245→                    .module-link {
+   246→                        text-decoration: none;
+   247→                        color: inherit;
+   248→                    }
+   249→                    
+   250→                    .module-card {
+   251→                        display: flex;
+   252→                        align-items: center;
+   253→                        padding: 1rem;
+   254→                        background: white;
+   255→                        border: 1px solid var(--border-color);
+   256→                        border-radius: var(--radius-md);
+   257→                        transition: all 0.2s ease;
+   258→                        cursor: pointer;
+   259→                        gap: 1rem;
+   260→                    }
+   261→                    
+   262→                    .module-card:hover {
+   263→                        border-color: var(--primary-color);
+   264→                        box-shadow: var(--shadow-md);
+   265→                        transform: translateY(-1px);
+   266→                    }
+   267→                    
+   268→                    .module-icon {
+   269→                        font-size: 1.5rem;
+   270→                        width: 2.5rem;
+   271→                        height: 2.5rem;
+   272→                        display: flex;
+   273→                        align-items: center;
+   274→                        justify-content: center;
+   275→                        background: var(--secondary-color);
+   276→                        border-radius: var(--radius-sm);
+   277→                        flex-shrink: 0;
+   278→                    }
+   279→                    
+   280→                    .module-content {
+   281→                        flex: 1;
+   282→                    }
+   283→                    
+   284→                    .module-content h4 {
+   285→                        font-size: 1rem;
+   286→                        font-weight: 600;
+   287→                        color: var(--text-primary);
+   288→                        margin-bottom: 0.25rem;
+   289→                    }
+   290→                    
+   291→                    .module-content p {
+   292→                        font-size: 0.875rem;
+   293→                        color: var(--text-secondary);
+   294→                        margin: 0;
+   295→                        line-height: 1.4;
+   296→                    }
+   297→                    
+   298→                    .module-arrow {
+   299→                        font-size: 1.25rem;
+   300→                        color: var(--text-secondary);
+   301→                        transition: all 0.2s ease;
+   302→                        flex-shrink: 0;
+   303→                    }
+   304→                    
+   305→                    .module-card:hover .module-arrow {
+   306→                        color: var(--primary-color);
+   307→                        transform: translateX(2px);
+   308→                    }
+   309→                    
+   310→                    @media (max-width: 768px) {
+   311→                        .grid-cols-2 {
+   312→                            grid-template-columns: 1fr;
+   313→                        }
+   314→                        
+   315→                        .grid-cols-3 {
+   316→                            grid-template-columns: 1fr;
+   317→                        }
+   318→                        
+   319→                        .module-card {
+   320→                            padding: 0.75rem;
+   321→                        }
+   322→                        
+   323→                        .section-title {
+   324→                            font-size: 1.125rem;
+   325→                        }
+   326→                    }
+   327→                </style>
+   328→            """;
+   329→
+   330→            String response = HtmlTemplate.render("Company Management System", bodyContent);
+   331→
+   332→            exchange.getResponseHeaders().set("Content-Type", "text/html; charset=utf-8");
+   333→            exchange.sendResponseHeaders(200, response.getBytes().length);
+   334→            try (OutputStream os = exchange.getResponseBody()) {
+   335→                os.write(response.getBytes());
+   336→            }
+   337→        });
+   338→
+   339→        // Register contexts from each module
+   340→        server.createContext("/company", new Company.RootHandler());
+   341→        server.createContext("/addCompany", new Company.AddCompanyHandler());
+   342→        server.createContext("/viewCompany", new Company.ViewCompanyHandler());
+   343→        server.createContext("/updateCompany", new Company.UpdateCompanyHandler());
+   344→        server.createContext("/deleteCompany", new Company.DeleteCompanyHandler());
+   345→
+   346→        server.createContext("/annual", new CompanyAnnualData.RootHandler());
+   347→        server.createContext("/addAnnualData", new CompanyAnnualData.AddHandler());
+   348→        server.createContext("/viewAnnualData", new CompanyAnnualData.ViewHandler());
+   349→        server.createContext("/updateAnnualData", new CompanyAnnualData.UpdateHandler());
+   350→        server.createContext("/deleteAnnualData", new CompanyAnnualData.DeleteHandler());
+   351→
+   352→        server.createContext("/branch", new CompanyCity.RootHandler());
+   353→        server.createContext("/addCompanyCity", new CompanyCity.AddHandler());
+   354→        server.createContext("/viewCompanyCity", new CompanyCity.ViewHandler());
+   355→        server.createContext("/updateCompanyCity", new CompanyCity.UpdateHandler());
+   356→        server.createContext("/deleteCompanyCity", new CompanyCity.DeleteHandler());
+   357→
+   358→        server.createContext("/founderlink", new CompanyFounder.RootHandler());
+   359→        server.createContext("/addCompanyFounder", new CompanyFounder.AddHandler());
+   360→        server.createContext("/viewCompanyFounder", new CompanyFounder.ViewHandler());
+   361→        server.createContext("/updateCompanyFounder", new CompanyFounder.UpdateHandler());
+   362→        server.createContext("/deleteCompanyFounder", new CompanyFounder.DeleteHandler());
+   363→
+   364→        server.createContext("/degree", new Degree.RootHandler());
+   365→        server.createContext("/addDegree", new Degree.AddDegreeHandler());
+   366→        server.createContext("/viewDegree", new Degree.ViewDegreeHandler());
+   367→        server.createContext("/updateDegree", new Degree.UpdateDegreeHandler());
+   368→        server.createContext("/deleteDegree", new Degree.DeleteDegreeHandler());
+   369→
+   370→        server.createContext("/founder", new Founder.RootHandler());
+   371→        server.createContext("/addFounder", new Founder.AddFounderHandler());
+   372→        server.createContext("/viewFounder", new Founder.ViewFounderHandler());
+   373→        server.createContext("/updateFounder", new Founder.UpdateFounderHandler());
+   374→        server.createContext("/deleteFounder", new Founder.DeleteFounderHandler());
+   375→
+   376→        server.createContext("/location", new Location.RootHandler());
+   377→        server.createContext("/addLocation", new Location.AddLocationHandler());
+   378→        server.createContext("/viewLocation", new Location.ViewLocationHandler());
+   379→        server.createContext("/updateLocation", new Location.UpdateLocationHandler());
+   380→        server.createContext("/deleteLocation", new Location.DeleteLocationHandler());
+   381→
+   382→        server.createContext("/sector", new Sector.RootHandler());
+   383→        server.createContext("/addSector", new Sector.AddSectorHandler());
+   384→        server.createContext("/viewSector", new Sector.ViewSectorHandler());
+   385→        server.createContext("/updateSector", new Sector.UpdateSectorHandler());
+   386→        server.createContext("/deleteSector", new Sector.DeleteSectorHandler());
+   387→
+   388→        server.createContext("/report", new ReportHandler());
+   389→        // Start the server
+   390→        server.setExecutor(null);
+   391→        server.start();
+   392→        System.out.println("🚀 SEECS Entrepreneurship Database Server started at http://localhost:5000");
+   393→        System.out.println("📊 Professional dashboard ready for management operations");
+   394→    }
+   395→}

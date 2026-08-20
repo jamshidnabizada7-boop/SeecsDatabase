@@ -1,0 +1,395 @@
+package app;
+import com.sun.net.httpserver.HttpServer;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.net.InetSocketAddress;
+
+public class MainApp {
+    public static void main(String[] args) throws IOException {
+        // Create server on port 8000
+        HttpServer server = HttpServer.create(new InetSocketAddress(5000), 0);
+
+        // Root Menu Page with Professional Design
+        server.createContext("/", exchange -> {
+            String bodyContent = """
+                 <div class="stats-grid">
+                                                                                      <div class="stat-card">
+                                                                                          <div class="stat-number">8</div>
+                                                                                          <div class="stat-label">Management Modules</div>
+                                                                                      </div>
+                                                                                      <div class="stat-card">
+                                                                                          <div class="stat-number">∞</div>
+                                                                                          <div class="stat-label">Data Records</div>
+                                                                                      </div>
+                                                                                      <div class="stat-card">
+                                                                                          <div class="stat-number">24/7</div>
+                                                                                          <div class="stat-label">System Availability</div>
+                                                                                      </div>
+                                                                                      <div class="stat-card">
+                                                                                          <div class="stat-number">CRUD</div>
+                                                                                          <div class="stat-label">Operations</div>
+                                                                                      </div>
+                                                                                  </div>
+                    
+                                                                                  <div class="card">
+                                                                                      <div class="card-header">
+                                                                                          <h2 class="card-title">System Navigation</h2>
+                                                                                          <p class="card-description">Select a module to manage your business data efficiently</p>
+                                                                                      </div>
+                    
+                                                                                      <div class="grid grid-cols-2">
+                                                                                          <div class="module-section">
+                                                                                              <h3 class="section-title">
+                                                                                                  <span class="section-icon">🏢</span>
+                                                                                                  Core Business
+                                                                                              </h3>
+                                                                                              <div class="module-list">
+                                                                                                  <a href="/company" class="module-link">
+                                                                                                      <div class="module-card">
+                                                                                                          <div class="module-icon">🏢</div>
+                                                                                                          <div class="module-content">
+                                                                                                              <h4>Company Management</h4>
+                                                                                                              <p>Manage company profiles, information, and details</p>
+                                                                                                          </div>
+                                                                                                          <div class="module-arrow">→</div>
+                                                                                                      </div>
+                                                                                                  </a>
+                    
+                                                                                                  <a href="/annual" class="module-link">
+                                                                                                      <div class="module-card">
+                                                                                                          <div class="module-icon">📊</div>
+                                                                                                          <div class="module-content">
+                                                                                                              <h4>Annual Data</h4>
+                                                                                                              <p>Track yearly performance and financial metrics</p>
+                                                                                                          </div>
+                                                                                                          <div class="module-arrow">→</div>
+                                                                                                      </div>
+                                                                                                  </a>
+                    
+                                                                                                  <a href="/branch" class="module-link">
+                                                                                                      <div class="module-card">
+                                                                                                          <div class="module-icon">🏬</div>
+                                                                                                          <div class="module-content">
+                                                                                                              <h4>Branch Locations</h4>
+                                                                                                              <p>Manage company branches across different cities</p>
+                                                                                                          </div>
+                                                                                                          <div class="module-arrow">→</div>
+                                                                                                      </div>
+                                                                                                  </a>
+                    
+                                                                                                  <a href="/sector" class="module-link">
+                                                                                                      <div class="module-card">
+                                                                                                          <div class="module-icon">⚙️</div>
+                                                                                                          <div class="module-content">
+                                                                                                              <h4>Business Sectors</h4>
+                                                                                                              <p>Define and categorize industry sectors</p>
+                                                                                                          </div>
+                                                                                                          <div class="module-arrow">→</div>
+                                                                                                      </div>
+                                                                                                  </a>
+                                                                                              </div>
+                                                                                          </div>
+                    
+                                                                                          <div class="module-section">
+                                                                                              <h3 class="section-title">
+                                                                                                  <span class="section-icon">👥</span>
+                                                                                                  People & Relations
+                                                                                              </h3>
+                                                                                              <div class="module-list">
+                                                                                                  <a href="/founder" class="module-link">
+                                                                                                      <div class="module-card">
+                                                                                                          <div class="module-icon">👤</div>
+                                                                                                          <div class="module-content">
+                                                                                                              <h4>Founder Profiles</h4>
+                                                                                                              <p>Manage entrepreneur and founder information</p>
+                                                                                                          </div>
+                                                                                                          <div class="module-arrow">→</div>
+                                                                                                      </div>
+                                                                                                  </a>
+                    
+                                                                                                  <a href="/founderlink" class="module-link">
+                                                                                                      <div class="module-card">
+                                                                                                          <div class="module-icon">🔗</div>
+                                                                                                          <div class="module-content">
+                                                                                                              <h4>Founder Links</h4>
+                                                                                                              <p>Connect founders with their companies</p>
+                                                                                                          </div>
+                                                                                                          <div class="module-arrow">→</div>
+                                                                                                      </div>
+                                                                                                  </a>
+                    
+                                                                                                  <a href="/degree" class="module-link">
+                                                                                                      <div class="module-card">
+                                                                                                          <div class="module-icon">🎓</div>
+                                                                                                          <div class="module-content">
+                                                                                                              <h4>Academic Degrees</h4>
+                                                                                                              <p>Manage educational qualifications and degrees</p>
+                                                                                                          </div>
+                                                                                                          <div class="module-arrow">→</div>
+                                                                                                      </div>
+                                                                                                  </a>
+                    
+                                                                                                  <a href="/location" class="module-link">
+                                                                                                      <div class="module-card">
+                                                                                                          <div class="module-icon">🌍</div>
+                                                                                                          <div class="module-content">
+                                                                                                              <h4>Geographic Locations</h4>
+                                                                                                              <p>Manage cities, regions, and geographic data</p>
+                                                                                                          </div>
+                                                                                                          <div class="module-arrow">→</div>
+                                                                                                      </div>
+                                                                                                  </a>
+                                                                                              </div>
+                                                                                          </div>
+                    
+                                                                                          <!-- 📊 Reports Section -->
+                                                                                          <div class="module-section">
+                                                                                              <h3 class="section-title">
+                                                                                                  <span class="section-icon">📊</span>
+                                                                                                  Reports & Insights
+                                                                                              </h3>
+                                                                                              <div class="module-list">
+                                                                                                  <a href="/report" class="module-link">
+                                                                                                      <div class="module-card">
+                                                                                                          <div class="module-icon">📑</div>
+                                                                                                          <div class="module-content">
+                                                                                                              <h4>Analytics Dashboard</h4>
+                                                                                                              <p>Explore predefined insights from your database</p>
+                                                                                                          </div>
+                                                                                                          <div class="module-arrow">→</div>
+                                                                                                      </div>
+                                                                                                  </a>
+                                                                                              </div>
+                                                                                          </div>
+                                                                                      </div>
+                                                                                  </div>
+                    
+                                                                                  <div class="card">
+                                                                                      <div class="card-header">
+                                                                                          <h2 class="card-title">Quick Actions</h2>
+                                                                                          <p class="card-description">Frequently used operations</p>
+                                                                                      </div>
+                    
+                                                                                      <div class="grid grid-cols-3">
+                                                                                          <a href="/company" class="btn btn-primary">
+                                                                                              <span>📈</span>
+                                                                                              View Dashboard
+                                                                                          </a>
+                                                                                          <a href="/addCompany" class="btn btn-secondary">
+                                                                                              <span>➕</span>
+                                                                                              Add New Company
+                                                                                          </a>
+                                                                                          <a href="/addFounder" class="btn btn-secondary">
+                                                                                              <span>👤</span>
+                                                                                              Register Founder
+                                                                                          </a>
+                                                                                          <a href="/report" class="btn btn-primary">
+                                                                                              <span>📑</span>
+                                                                                              View Reports
+                                                                                          </a>
+                                                                                      </div>
+                                                                                  </div>
+                    
+                                                                                  <style>
+                                                                                      .module-section { margin-bottom: 2rem; }
+                                                                                      .section-title { display: flex; align-items: center; gap: 0.75rem; font-size: 1.25rem; font-weight: 600; color: var(--text-primary); margin-bottom: 1rem; padding-bottom: 0.5rem; border-bottom: 2px solid var(--border-color); }
+                                                                                      .section-icon { font-size: 1.5rem; }
+                                                                                      .module-list { display: flex; flex-direction: column; gap: 0.75rem; }
+                                                                                      .module-link { text-decoration: none; color: inherit; }
+                                                                                      .module-card { display: flex; align-items: center; padding: 1rem; background: white; border: 1px solid var(--border-color); border-radius: var(--radius-md); transition: all 0.2s ease; cursor: pointer; gap: 1rem; }
+                                                                                      .module-card:hover { border-color: var(--primary-color); box-shadow: var(--shadow-md); transform: translateY(-1px); }
+                                                                                      .module-icon { font-size: 1.5rem; width: 2.5rem; height: 2.5rem; display: flex; align-items: center; justify-content: center; background: var(--secondary-color); border-radius: var(--radius-sm); flex-shrink: 0; }
+                                                                                      .module-content { flex: 1; }
+                                                                                      .module-content h4 { font-size: 1rem; font-weight: 600; color: var(--text-primary); margin-bottom: 0.25rem; }
+                                                                                      .module-content p { font-size: 0.875rem; color: var(--text-secondary); margin: 0; line-height: 1.4; }
+                                                                                      .module-arrow { font-size: 1.25rem; color: var(--text-secondary); transition: all 0.2s ease; flex-shrink: 0; }
+                                                                                      .module-card:hover .module-arrow { color: var(--primary-color); transform: translateX(2px); }
+                                                                                      @media (max-width: 768px) {
+                                                                                          .grid-cols-2 { grid-template-columns: 1fr; }
+                                                                                          .grid-cols-3 { grid-template-columns: 1fr; }
+                                                                                          .module-card { padding: 0.75rem; }
+                                                                                          .section-title { font-size: 1.125rem; }
+                                                                                      }
+                                                                                  </style>
+                                                                              ";
+                    
+                </div>
+
+                <style>
+                    .module-section {
+                        margin-bottom: 2rem;
+                    }
+                    
+                    .section-title {
+                        display: flex;
+                        align-items: center;
+                        gap: 0.75rem;
+                        font-size: 1.25rem;
+                        font-weight: 600;
+                        color: var(--text-primary);
+                        margin-bottom: 1rem;
+                        padding-bottom: 0.5rem;
+                        border-bottom: 2px solid var(--border-color);
+                    }
+                    
+                    .section-icon {
+                        font-size: 1.5rem;
+                    }
+                    
+                    .module-list {
+                        display: flex;
+                        flex-direction: column;
+                        gap: 0.75rem;
+                    }
+                    
+                    .module-link {
+                        text-decoration: none;
+                        color: inherit;
+                    }
+                    
+                    .module-card {
+                        display: flex;
+                        align-items: center;
+                        padding: 1rem;
+                        background: white;
+                        border: 1px solid var(--border-color);
+                        border-radius: var(--radius-md);
+                        transition: all 0.2s ease;
+                        cursor: pointer;
+                        gap: 1rem;
+                    }
+                    
+                    .module-card:hover {
+                        border-color: var(--primary-color);
+                        box-shadow: var(--shadow-md);
+                        transform: translateY(-1px);
+                    }
+                    
+                    .module-icon {
+                        font-size: 1.5rem;
+                        width: 2.5rem;
+                        height: 2.5rem;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        background: var(--secondary-color);
+                        border-radius: var(--radius-sm);
+                        flex-shrink: 0;
+                    }
+                    
+                    .module-content {
+                        flex: 1;
+                    }
+                    
+                    .module-content h4 {
+                        font-size: 1rem;
+                        font-weight: 600;
+                        color: var(--text-primary);
+                        margin-bottom: 0.25rem;
+                    }
+                    
+                    .module-content p {
+                        font-size: 0.875rem;
+                        color: var(--text-secondary);
+                        margin: 0;
+                        line-height: 1.4;
+                    }
+                    
+                    .module-arrow {
+                        font-size: 1.25rem;
+                        color: var(--text-secondary);
+                        transition: all 0.2s ease;
+                        flex-shrink: 0;
+                    }
+                    
+                    .module-card:hover .module-arrow {
+                        color: var(--primary-color);
+                        transform: translateX(2px);
+                    }
+                    
+                    @media (max-width: 768px) {
+                        .grid-cols-2 {
+                            grid-template-columns: 1fr;
+                        }
+                        
+                        .grid-cols-3 {
+                            grid-template-columns: 1fr;
+                        }
+                        
+                        .module-card {
+                            padding: 0.75rem;
+                        }
+                        
+                        .section-title {
+                            font-size: 1.125rem;
+                        }
+                    }
+                </style>
+            """;
+
+            String response = HtmlTemplate.render("Company Management System", bodyContent);
+
+            exchange.getResponseHeaders().set("Content-Type", "text/html; charset=utf-8");
+            exchange.sendResponseHeaders(200, response.getBytes().length);
+            try (OutputStream os = exchange.getResponseBody()) {
+                os.write(response.getBytes());
+            }
+        });
+
+        // Register contexts from each module
+        server.createContext("/company", new Company.RootHandler());
+        server.createContext("/addCompany", new Company.AddCompanyHandler());
+        server.createContext("/viewCompany", new Company.ViewCompanyHandler());
+        server.createContext("/updateCompany", new Company.UpdateCompanyHandler());
+        server.createContext("/deleteCompany", new Company.DeleteCompanyHandler());
+
+        server.createContext("/annual", new CompanyAnnualData.RootHandler());
+        server.createContext("/addAnnualData", new CompanyAnnualData.AddHandler());
+        server.createContext("/viewAnnualData", new CompanyAnnualData.ViewHandler());
+        server.createContext("/updateAnnualData", new CompanyAnnualData.UpdateHandler());
+        server.createContext("/deleteAnnualData", new CompanyAnnualData.DeleteHandler());
+
+        server.createContext("/branch", new CompanyCity.RootHandler());
+        server.createContext("/addCompanyCity", new CompanyCity.AddHandler());
+        server.createContext("/viewCompanyCity", new CompanyCity.ViewHandler());
+        server.createContext("/updateCompanyCity", new CompanyCity.UpdateHandler());
+        server.createContext("/deleteCompanyCity", new CompanyCity.DeleteHandler());
+
+        server.createContext("/founderlink", new CompanyFounder.RootHandler());
+        server.createContext("/addCompanyFounder", new CompanyFounder.AddHandler());
+        server.createContext("/viewCompanyFounder", new CompanyFounder.ViewHandler());
+        server.createContext("/updateCompanyFounder", new CompanyFounder.UpdateHandler());
+        server.createContext("/deleteCompanyFounder", new CompanyFounder.DeleteHandler());
+
+        server.createContext("/degree", new Degree.RootHandler());
+        server.createContext("/addDegree", new Degree.AddDegreeHandler());
+        server.createContext("/viewDegree", new Degree.ViewDegreeHandler());
+        server.createContext("/updateDegree", new Degree.UpdateDegreeHandler());
+        server.createContext("/deleteDegree", new Degree.DeleteDegreeHandler());
+
+        server.createContext("/founder", new Founder.RootHandler());
+        server.createContext("/addFounder", new Founder.AddFounderHandler());
+        server.createContext("/viewFounder", new Founder.ViewFounderHandler());
+        server.createContext("/updateFounder", new Founder.UpdateFounderHandler());
+        server.createContext("/deleteFounder", new Founder.DeleteFounderHandler());
+
+        server.createContext("/location", new Location.RootHandler());
+        server.createContext("/addLocation", new Location.AddLocationHandler());
+        server.createContext("/viewLocation", new Location.ViewLocationHandler());
+        server.createContext("/updateLocation", new Location.UpdateLocationHandler());
+        server.createContext("/deleteLocation", new Location.DeleteLocationHandler());
+
+        server.createContext("/sector", new Sector.RootHandler());
+        server.createContext("/addSector", new Sector.AddSectorHandler());
+        server.createContext("/viewSector", new Sector.ViewSectorHandler());
+        server.createContext("/updateSector", new Sector.UpdateSectorHandler());
+        server.createContext("/deleteSector", new Sector.DeleteSectorHandler());
+
+        server.createContext("/report", new ReportHandler());
+        // Start the server
+        server.setExecutor(null);
+        server.start();
+        System.out.println("🚀 SEECS Entrepreneurship Database Server started at http://localhost:5000");
+        System.out.println("📊 Professional dashboard ready for management operations");
+    }
+}
