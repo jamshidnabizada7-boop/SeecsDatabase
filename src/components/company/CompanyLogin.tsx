@@ -21,6 +21,7 @@ import {
   Plus,
   Trash2,
   Users,
+  Globe,
 } from 'lucide-react'
 import { Separator } from '@/components/ui/separator'
 import { ThemeToggle } from '@/components/theme-toggle'
@@ -39,6 +40,25 @@ interface CoFounderEntry {
   email: string
   department: string
 }
+
+const COMMON_COUNTRIES = [
+  { value: 'United States', label: 'United States (USA)' },
+  { value: 'United Kingdom', label: 'United Kingdom (UK)' },
+  { value: 'United Arab Emirates', label: 'United Arab Emirates (UAE)' },
+  { value: 'Saudi Arabia', label: 'Saudi Arabia' },
+  { value: 'Germany', label: 'Germany' },
+  { value: 'Canada', label: 'Canada' },
+  { value: 'Australia', label: 'Australia' },
+  { value: 'Singapore', label: 'Singapore' },
+  { value: 'Qatar', label: 'Qatar' },
+  { value: 'Netherlands', label: 'Netherlands' },
+  { value: 'Ireland', label: 'Ireland' },
+  { value: 'Sweden', label: 'Sweden' },
+  { value: 'Turkey', label: 'Turkey' },
+  { value: 'Japan', label: 'Japan' },
+  { value: 'Malaysia', label: 'Malaysia' },
+  { value: 'China', label: 'China' },
+]
 
 export default function CompanyLogin({ onLoggedIn, onExit }: { onLoggedIn: (c: any) => void; onExit: () => void }) {
   const [mode, setMode] = useState<'login' | 'register'>('login')
@@ -60,6 +80,9 @@ export default function CompanyLogin({ onLoggedIn, onExit }: { onLoggedIn: (c: a
   const [website, setWebsite] = useState('')
   const [sector, setSector] = useState('')
   const [city, setCity] = useState('')
+  const [isInternational, setIsInternational] = useState(false)
+  const [country, setCountry] = useState('United States')
+  const [internationalCity, setInternationalCity] = useState('')
   const [address, setAddress] = useState('')
   const [contactName, setContactName] = useState('')
   const [contactEmail, setContactEmail] = useState('')
@@ -72,6 +95,7 @@ export default function CompanyLogin({ onLoggedIn, onExit }: { onLoggedIn: (c: a
   const contactNameValid = contactName.trim().length >= 2
   const contactEmailValid = !contactEmail.trim() || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contactEmail.trim())
   const websiteValid = !website.trim() || website.trim().startsWith('http') || /^[\w.-]+\.[a-z]{2,}$/i.test(website.trim())
+  const effectiveCity = isInternational ? (internationalCity.trim() ? `${internationalCity.trim()} (${country.trim()})` : '') : city.trim()
 
   const loadLookup = async () => {
     try {
@@ -124,7 +148,7 @@ export default function CompanyLogin({ onLoggedIn, onExit }: { onLoggedIn: (c: a
 
   const submitRegister = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!sector.trim() || !city.trim() || !nameValid || !contactNameValid || !contactEmailValid) return
+    if (!sector.trim() || !effectiveCity || !nameValid || !contactNameValid || !contactEmailValid) return
     setLoading(true)
     setError('')
     try {
@@ -137,7 +161,8 @@ export default function CompanyLogin({ onLoggedIn, onExit }: { onLoggedIn: (c: a
           phone: phone.trim() || undefined,
           website: website.trim() || undefined,
           sectorId: sector.trim(),
-          cityId: city.trim(),
+          cityId: effectiveCity,
+          country: isInternational ? country.trim() : 'Pakistan',
           address: address.trim() || undefined,
           contactName: contactName.trim(),
           contactEmail: contactEmail.trim(),
@@ -348,7 +373,7 @@ export default function CompanyLogin({ onLoggedIn, onExit }: { onLoggedIn: (c: a
                 <div>
                   <CardTitle>Register your company</CardTitle>
                   <CardDescription>
-                    Fill in your company details. Choose from the list or type a new sector/city.
+                    Fill in your company details. Choose from extensive sector/city lists or enter custom location.
                   </CardDescription>
                 </div>
               </div>
@@ -398,36 +423,82 @@ export default function CompanyLogin({ onLoggedIn, onExit }: { onLoggedIn: (c: a
                         className={!websiteValid && website.length > 0 ? 'border-destructive' : ''}
                       />
                     </div>
-                    <div className="space-y-1.5">
-                      <Label>Sector <span className="text-destructive">*</span></Label>
+                    <div className="space-y-1.5 sm:col-span-2">
+                      <Label>Sector / Industry <span className="text-destructive">*</span></Label>
                       <Combobox
                         options={sectorOptions}
                         value={sector}
                         onChange={setSector}
                         placeholder="Select or type sector..."
-                        searchPlaceholder="Search sectors..."
+                        searchPlaceholder="Search 70+ sectors..."
                         createLabel="Use new sector"
                       />
-                      {!sector && <p className="text-[11px] text-muted-foreground">Select from list or type to create a new one.</p>}
+                      {!sector && <p className="text-[11px] text-muted-foreground">Select from 70+ industry sectors or type your own.</p>}
                     </div>
-                    <div className="space-y-1.5">
-                      <Label>City <span className="text-destructive">*</span></Label>
-                      <Combobox
-                        options={cityOptions}
-                        value={city}
-                        onChange={setCity}
-                        placeholder="Select or type city..."
-                        searchPlaceholder="Search cities..."
-                        createLabel="Use new city"
-                      />
-                      {!city && <p className="text-[11px] text-muted-foreground">Select from list or type to create a new one.</p>}
+
+                    {/* Location toggle (Pakistan vs International) */}
+                    <div className="sm:col-span-2 pt-1">
+                      <div className="flex items-center justify-between p-2.5 rounded-lg border bg-muted/30">
+                        <div className="flex items-center gap-2">
+                          <Globe className="h-4 w-4 text-emerald-600" />
+                          <span className="text-xs font-medium">Is this company based outside Pakistan?</span>
+                        </div>
+                        <label className="relative inline-flex items-center cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={isInternational}
+                            onChange={(e) => setIsInternational(e.target.checked)}
+                            className="sr-only peer"
+                          />
+                          <div className="w-9 h-5 bg-stone-300 peer-focus:outline-none rounded-full peer dark:bg-stone-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-stone-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all dark:border-stone-600 peer-checked:bg-emerald-600"></div>
+                        </label>
+                      </div>
                     </div>
+
+                    {isInternational ? (
+                      <>
+                        <div className="space-y-1.5">
+                          <Label>Country <span className="text-destructive">*</span></Label>
+                          <Combobox
+                            options={COMMON_COUNTRIES}
+                            value={country}
+                            onChange={setCountry}
+                            placeholder="Select or type country..."
+                            searchPlaceholder="Search country..."
+                            createLabel="Use country"
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label>City <span className="text-destructive">*</span></Label>
+                          <Input
+                            value={internationalCity}
+                            onChange={(e) => setInternationalCity(e.target.value)}
+                            placeholder="e.g. San Francisco, London, Dubai"
+                            required
+                          />
+                        </div>
+                      </>
+                    ) : (
+                      <div className="space-y-1.5 sm:col-span-2">
+                        <Label>City (Pakistan) <span className="text-destructive">*</span></Label>
+                        <Combobox
+                          options={cityOptions}
+                          value={city}
+                          onChange={setCity}
+                          placeholder="Select or type city..."
+                          searchPlaceholder="Search 150+ Pakistani cities..."
+                          createLabel="Use new city"
+                        />
+                        {!city && <p className="text-[11px] text-muted-foreground">Select from all major cities/districts of Pakistan or type a new city.</p>}
+                      </div>
+                    )}
+
                     <div className="space-y-1.5 sm:col-span-2">
                       <Label>Office address (optional)</Label>
                       <Input
                         value={address}
                         onChange={(e) => setAddress(e.target.value)}
-                        placeholder="e.g. Office #402, Software Technology Park, Islamabad"
+                        placeholder="e.g. Office #402, Software Technology Park / Building Name"
                       />
                     </div>
                   </div>
@@ -545,7 +616,7 @@ export default function CompanyLogin({ onLoggedIn, onExit }: { onLoggedIn: (c: a
                   <Button
                     type="submit"
                     className="flex-1 bg-emerald-600 hover:bg-emerald-700"
-                    disabled={loading || !sector || !city || !nameValid || !contactNameValid || !contactEmailValid}
+                    disabled={loading || !sector || !effectiveCity || !nameValid || !contactNameValid || !contactEmailValid}
                   >
                     {loading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                     Register company

@@ -660,6 +660,9 @@ function AllInOneCompanyDialog({
   const [website, setWebsite] = useState('')
   const [sector, setSector] = useState('')
   const [city, setCity] = useState('')
+  const [isInternational, setIsInternational] = useState(false)
+  const [country, setCountry] = useState('United States')
+  const [internationalCity, setInternationalCity] = useState('')
   const [address, setAddress] = useState('')
   const [status, setStatus] = useState('Operational')
   const [foundedYear, setFoundedYear] = useState('')
@@ -687,6 +690,16 @@ function AllInOneCompanyDialog({
       setFoundedYear(company?.foundedYear ? String(company.foundedYear) : '')
       setRevenue(company?.revenue != null ? String(company.revenue) : '')
       setBranchesCount(company?.branchesCount != null ? String(company.branchesCount) : '')
+
+      if (company?.location?.country && company.location.country.toLowerCase() !== 'pakistan') {
+        setIsInternational(true)
+        setCountry(company.location.country)
+        setInternationalCity(company.city?.name?.replace(/\s*\([^)]*\)/, '') || company.city?.name || '')
+      } else {
+        setIsInternational(false)
+        setCountry('United States')
+        setInternationalCity('')
+      }
 
       // Populate founders
       if (company?.founders?.length) {
@@ -770,7 +783,8 @@ function AllInOneCompanyDialog({
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!name.trim() || !sector.trim() || !city.trim()) {
+    const effectiveCity = isInternational ? (internationalCity.trim() ? `${internationalCity.trim()} (${country.trim()})` : '') : city.trim()
+    if (!name.trim() || !sector.trim() || !effectiveCity) {
       toast({ title: 'Validation Error', description: 'Name, Sector, and City are required.', variant: 'destructive' })
       return
     }
@@ -784,7 +798,8 @@ function AllInOneCompanyDialog({
         phone: phone.trim() || null,
         website: website.trim() || null,
         sectorId: sector.trim(),
-        cityId: city.trim(),
+        cityId: effectiveCity,
+        country: isInternational ? country.trim() : 'Pakistan',
         address: address.trim() || null,
         status,
         foundedYear: foundedYear ? Number(foundedYear) : null,
@@ -918,22 +933,83 @@ function AllInOneCompanyDialog({
                     value={sector}
                     onChange={setSector}
                     placeholder="Select or type sector..."
-                    searchPlaceholder="Search sectors..."
+                    searchPlaceholder="Search 70+ sectors..."
                     createLabel="Create new sector"
                   />
-                  <p className="text-[11px] text-muted-foreground">Search from existing sectors or type a new one.</p>
+                  <p className="text-[11px] text-muted-foreground">Search from 70+ industry sectors or type a new one.</p>
                 </div>
-                <div className="space-y-1 sm:col-span-2">
-                  <Label>City <span className="text-destructive">*</span></Label>
-                  <Combobox
-                    options={cityOptions}
-                    value={city}
-                    onChange={setCity}
-                    placeholder="Select or type city..."
-                    searchPlaceholder="Search cities..."
-                    createLabel="Create new city"
-                  />
+
+                <div className="sm:col-span-2 pt-1">
+                  <div className="flex items-center justify-between p-2.5 rounded-lg border bg-muted/30">
+                    <div className="flex items-center gap-2">
+                      <Globe className="h-4 w-4 text-emerald-600" />
+                      <span className="text-xs font-medium">Is this company based outside Pakistan?</span>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={isInternational}
+                        onChange={(e) => setIsInternational(e.target.checked)}
+                        className="sr-only peer"
+                      />
+                      <div className="w-9 h-5 bg-stone-300 peer-focus:outline-none rounded-full peer dark:bg-stone-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-stone-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all dark:border-stone-600 peer-checked:bg-emerald-600"></div>
+                    </label>
+                  </div>
                 </div>
+
+                {isInternational ? (
+                  <>
+                    <div className="space-y-1">
+                      <Label>Country <span className="text-destructive">*</span></Label>
+                      <Combobox
+                        options={[
+                          { value: 'United States', label: 'United States (USA)' },
+                          { value: 'United Kingdom', label: 'United Kingdom (UK)' },
+                          { value: 'United Arab Emirates', label: 'United Arab Emirates (UAE)' },
+                          { value: 'Saudi Arabia', label: 'Saudi Arabia' },
+                          { value: 'Germany', label: 'Germany' },
+                          { value: 'Canada', label: 'Canada' },
+                          { value: 'Australia', label: 'Australia' },
+                          { value: 'Singapore', label: 'Singapore' },
+                          { value: 'Qatar', label: 'Qatar' },
+                          { value: 'Netherlands', label: 'Netherlands' },
+                          { value: 'Ireland', label: 'Ireland' },
+                          { value: 'Sweden', label: 'Sweden' },
+                          { value: 'Turkey', label: 'Turkey' },
+                          { value: 'Japan', label: 'Japan' },
+                        ]}
+                        value={country}
+                        onChange={setCountry}
+                        placeholder="Select or type country..."
+                        searchPlaceholder="Search country..."
+                        createLabel="Use country"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label>City <span className="text-destructive">*</span></Label>
+                      <Input
+                        value={internationalCity}
+                        onChange={(e) => setInternationalCity(e.target.value)}
+                        placeholder="e.g. San Francisco, London, Dubai"
+                        required
+                      />
+                    </div>
+                  </>
+                ) : (
+                  <div className="space-y-1 sm:col-span-2">
+                    <Label>City (Pakistan) <span className="text-destructive">*</span></Label>
+                    <Combobox
+                      options={cityOptions}
+                      value={city}
+                      onChange={setCity}
+                      placeholder="Select or type city..."
+                      searchPlaceholder="Search 150+ Pakistani cities..."
+                      createLabel="Create new city"
+                    />
+                    <p className="text-[11px] text-muted-foreground">Search from 150+ cities across all provinces of Pakistan or type a new one.</p>
+                  </div>
+                )}
+
                 <div className="space-y-1 sm:col-span-2">
                   <Label>Full Address / Head Office</Label>
                   <Input

@@ -68,6 +68,7 @@ export async function PUT(req: Request, ctx: Ctx) {
     sectorId: rawSector,
     cityId: rawCity,
     address,
+    country,
     locationId: rawLocationId,
     founders,
     founderIds,
@@ -119,10 +120,14 @@ export async function PUT(req: Request, ctx: Ctx) {
     data.cityId = resolvedCity.id
 
     // Location resolution
-    if (address !== undefined) {
-      if (address && String(address).trim()) {
+    if (address !== undefined || (country && country.trim().toLowerCase() !== 'pakistan')) {
+      if (address || (country && country.trim().toLowerCase() !== 'pakistan')) {
         const loc = await db.location.create({
-          data: { address: String(address).trim(), cityId: resolvedCity.id, country: 'Pakistan' },
+          data: {
+            address: address ? String(address).trim() : resolvedCity.name,
+            cityId: resolvedCity.id,
+            country: String(country || 'Pakistan').trim(),
+          },
         })
         data.locationId = loc.id
       } else {

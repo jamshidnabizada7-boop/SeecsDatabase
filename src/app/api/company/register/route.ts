@@ -18,7 +18,9 @@ export async function POST(req: Request) {
     website,
     sectorId: rawSector,
     cityId: rawCity,
-    locationId,
+    address,
+    country = 'Pakistan',
+    locationId: rawLocationId,
     contactName,
     contactEmail,
     contactPhone,
@@ -50,7 +52,20 @@ export async function POST(req: Request) {
     resolvedCity = await db.city.create({ data: { name: String(rawCity).trim() } })
   }
 
-  // 3. Check for existing company name
+  // 3. Resolve or create Location
+  let resolvedLocationId = rawLocationId || null
+  if (address || (country && country.trim().toLowerCase() !== 'pakistan')) {
+    const loc = await db.location.create({
+      data: {
+        address: address ? String(address).trim() : resolvedCity.name,
+        country: String(country || 'Pakistan').trim(),
+        cityId: resolvedCity.id,
+      },
+    })
+    resolvedLocationId = loc.id
+  }
+
+  // 4. Check for existing company name
   const existing = await db.company.findFirst({
     where: { name: { equals: String(name).trim(), mode: 'insensitive' } },
   })
@@ -72,7 +87,7 @@ export async function POST(req: Request) {
       website: website || null,
       sectorId: resolvedSector.id,
       cityId: resolvedCity.id,
-      locationId: locationId || null,
+      locationId: resolvedLocationId,
       status: 'Operational',
       apiKey,
       apiKeyActive: true,
@@ -80,7 +95,7 @@ export async function POST(req: Request) {
     include: { sector: true, city: true, location: true },
   })
 
-  // 4. Create primary contact founder
+  // 5. Create primary contact founder
   try {
     const contactParts = String(contactName).trim().split(' ')
     const firstName = contactParts[0] || 'Contact'
@@ -101,7 +116,7 @@ export async function POST(req: Request) {
     console.error('Failed to create primary founder:', err)
   }
 
-  // 5. Create additional founders if passed
+  // 6. Create additional founders if passed
   if (Array.isArray(founders)) {
     for (const f of founders) {
       if (!f.name && !f.firstName) continue
@@ -110,7 +125,6 @@ export async function POST(req: Request) {
         const fn = f.firstName || fParts[0] || 'Founder'
         const ln = f.lastName || fParts.slice(1).join(' ') || ''
         
-        // Resolve degree if given
         let degreeId: string | null = null
         if (f.degree) {
           const d = await db.degree.findFirst({ where: { name: { equals: String(f.degree).trim(), mode: 'insensitive' } } })

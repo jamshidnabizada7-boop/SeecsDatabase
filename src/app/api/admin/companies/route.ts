@@ -122,6 +122,7 @@ export async function POST(req: Request) {
     sectorId: rawSector,
     cityId: rawCity,
     address,
+    country = 'Pakistan',
     locationId: rawLocationId,
     founders = [],
     founderIds = [],
@@ -153,12 +154,12 @@ export async function POST(req: Request) {
 
   // 3. Resolve or create Location
   let resolvedLocationId = rawLocationId || null
-  if (address && String(address).trim()) {
+  if (address || (country && country.trim().toLowerCase() !== 'pakistan')) {
     const loc = await db.location.create({
       data: {
-        address: String(address).trim(),
+        address: address ? String(address).trim() : resolvedCity.name,
         cityId: resolvedCity.id,
-        country: 'Pakistan',
+        country: String(country || 'Pakistan').trim(),
       },
     })
     resolvedLocationId = loc.id
